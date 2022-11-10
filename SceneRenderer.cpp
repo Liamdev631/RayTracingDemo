@@ -6,7 +6,7 @@
 using namespace glm;
 
 SceneRenderer::SceneRenderer(const sf::Vector2u& frameSize)
-	: _frameSize(frameSize)//, _frameBuffer(new sf::Color[_frameSize.x * _frameSize.y])
+	: _frameSize(frameSize), _frameBuffer(nullptr)
 {
 
 }
@@ -36,7 +36,7 @@ void SceneRenderer::Render(unique_ptr<sf::Texture>& renderTarget)
 		for (unsigned x = 0; x < _frameSize.x; x++)
 		{
 			//currentRay.direction = normalize(fvec3(x - halfFrameSize.x, -10, y - halfFrameSize.y));
-			currentRay.position = { (float)x - halfFrameSize.x, halfFrameSize.y - (float)y, -1000 };
+			currentRay.position = { (float)x - halfFrameSize.x, halfFrameSize.y - (float)y, -500 };
 			//static float timer = 0.f;
 			//timer += 0.01f;
 			//currentRay.position = glm::rotateY(currentRay.position, timer);

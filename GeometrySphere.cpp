@@ -37,21 +37,22 @@ bool GeometrySphere::Intersects(const Scene* scene, const Ray& ray, Hit& outHit)
 
 	return true;*/
 
-	fvec3 baseColor = { 0, 0.8f, 0 };
+	fvec3 baseColor = { 0.8, 0.8f, 0.8 };
 	fvec3 blendColor = { 0, 0, 0 };
 	blendColor += scene->AmbientLightColor * scene->AmbientIntensity;
 
 	// Cast rays from this point to every light source
 	Ray lightRay;
 	lightRay.position = outHit.Position + outHit.Normal * 0.01f;
-	for (auto& light : scene->GetLightCollection())
+	for (const auto& light : scene->GetLightCollection())
 	{
 		lightRay.direction = -normalize(light->Position - outHit.Position);
 		if (!scene->IntersectsAny(lightRay))
 		{
-			float diffuseFactor = dot(normalize(outHit.Normal), light->Direction);
+			float distance = length2(light->Position - outHit.Position);
+			float diffuseFactor = dot(normalize(outHit.Normal), lightRay.direction);
 			if (diffuseFactor > 0)
-				blendColor += light->Color * light->Intensity * diffuseFactor / length2(light->Position - outHit.Position);
+				blendColor += light->Color * light->Intensity * diffuseFactor / distance*distance;
 		}
 	}
 

@@ -11,12 +11,11 @@ class Geometry;
 struct PointLight
 {
 	fvec3 Position;
-	fvec3 Direction;
 	fvec3 Color;
 	float Intensity;
 
-	PointLight(fvec3 position, fvec3 direction, fvec3 color, float intensity)
-		: Position(position), Direction(direction), Color(color), Intensity(intensity)
+	PointLight(fvec3 position, fvec3 color, float intensity)
+		: Position(position), Color(color), Intensity(intensity)
 	{ }
 };
 
