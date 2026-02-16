@@ -8,6 +8,9 @@
 /out/
 Ray
 
+# Output
+output/
+
 # CMake
 CMakeUserPresets.json
 CMakeCache.txt

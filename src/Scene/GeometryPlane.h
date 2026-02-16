@@ -14,4 +14,3 @@ public:
 	bool Intersects(const Scene* scene, const Ray& ray, Hit& outHit) const override;
 	bool IntersectsAny(const Ray& ray) const override;
 };
-

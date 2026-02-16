@@ -48,6 +48,39 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SFML)
 
+# 3. nlohmann_json
+message(STATUS "Fetching nlohmann_json...")
+FetchContent_Declare(
+    json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(json)
+
+# 4. CLI11
+message(STATUS "Fetching CLI11...")
+FetchContent_Declare(
+    CLI11
+    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+    GIT_TAG v2.4.1
+)
+FetchContent_MakeAvailable(CLI11)
+
+# 5. stb
+message(STATUS "Fetching stb...")
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+)
+FetchContent_GetProperties(stb)
+if(NOT stb_POPULATED)
+    FetchContent_Populate(stb)
+endif()
+# stb is header only, we just need the include path
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+
 # Define Sources
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.h" "src/*.hpp")
 
@@ -66,9 +99,9 @@ target_include_directories(RayTracingDemo PRIVATE
 # But via FetchContent/add_subdirectory, they might be SFML::Graphics etc. or sfml-graphics
 # Official SFML CMake defines targets as sfml-graphics, sfml-window, sfml-system (and aliases SFML::Graphics etc.)
 if(TARGET SFML::Graphics)
-    target_link_libraries(RayTracingDemo PRIVATE glm::glm SFML::Graphics SFML::Window SFML::System)
+    target_link_libraries(RayTracingDemo PRIVATE glm::glm SFML::Graphics SFML::Window SFML::System nlohmann_json::nlohmann_json CLI11::CLI11 stb)
 else()
-    target_link_libraries(RayTracingDemo PRIVATE glm::glm sfml-graphics sfml-window sfml-system)
+    target_link_libraries(RayTracingDemo PRIVATE glm::glm sfml-graphics sfml-window sfml-system nlohmann_json::nlohmann_json CLI11::CLI11 stb)
 endif()
 
 # Compiler Options for Performance
