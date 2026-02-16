@@ -47,12 +47,43 @@ public:
             }
         }
 
-        // Load Point Lights
+        // Load Scene Settings (Camera & Animation)
+        if (j.contains("settings"))
+        {
+            auto& settings = j["settings"];
+            if (settings.contains("camera"))
+            {
+                auto& cam = settings["camera"];
+                if (cam.contains("position")) {
+                    scene->CameraPosition = { cam["position"][0], cam["position"][1], cam["position"][2] };
+                    scene->InitialCameraPosition = scene->CameraPosition;
+                }
+                if (cam.contains("target")) {
+                    scene->CameraTarget = { cam["target"][0], cam["target"][1], cam["target"][2] };
+                }
+                if (cam.contains("fov")) {
+                    scene->CameraFOV = cam["fov"].get<float>();
+                }
+            }
+            
+            if (settings.contains("animation"))
+            {
+                auto& anim = settings["animation"];
+                if (anim.contains("camera_speed"))
+                    scene->CameraRotationSpeed = anim["camera_speed"];
+                if (anim.contains("sun_speed"))
+                    scene->SunRotationSpeed = anim["sun_speed"];
+            }
+        }
+
+        // Load Lights
+        bool hasDirectionalLight = false;
         if (j.contains("lights"))
         {
             for (const auto& lightData : j["lights"])
             {
-                if (lightData["type"] == "point")
+                string type = lightData["type"];
+                if (type == "point")
                 {
                     fvec3 pos = {
                         lightData["position"][0].get<float>(),
@@ -67,7 +98,37 @@ public:
                     float intensity = lightData["intensity"].get<float>();
                     scene->AddLight(new PointLight(pos, color, intensity));
                 }
+                else if (type == "directional")
+                {
+                    if (hasDirectionalLight)
+                    {
+                        cerr << "Warning: Multiple directional lights found. Only the first one will be used." << endl;
+                        continue;
+                    }
+                    
+                    fvec3 dir = {
+                        lightData["direction"][0].get<float>(),
+                        lightData["direction"][1].get<float>(),
+                        lightData["direction"][2].get<float>()
+                    };
+                    fvec3 color = {
+                        lightData["color"][0].get<float>(),
+                        lightData["color"][1].get<float>(),
+                        lightData["color"][2].get<float>()
+                    };
+                    float intensity = lightData["intensity"].get<float>();
+                    
+                    scene->SunLight = DirectionalLight(dir, color, intensity);
+                    scene->InitialSunDirection = glm::normalize(dir);
+                    scene->InitialSunIntensity = intensity;
+                    hasDirectionalLight = true;
+                }
             }
+        }
+        
+        if (!hasDirectionalLight)
+        {
+            cerr << "Warning: No directional light found in scene. Using default." << endl;
         }
 
         // Load Geometry

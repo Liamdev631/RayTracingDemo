@@ -1,26 +1,37 @@
 {
+    "settings": {
+        "camera": {
+            "position": [0.0, 200.0, 800.0],
+            "target": [0.0, 0.0, 0.0],
+            "fov": 60.0
+        },
+        "animation": {
+            "camera_speed": 0.5,
+            "sun_speed": 0.3
+        }
+    },
     "ambient_light": {
         "color": [1.0, 1.0, 1.0],
         "intensity": 0.1
     },
     "lights": [
         {
+            "type": "directional",
+            "direction": [-1.0, -1.0, -1.0],
+            "color": [1.0, 0.95, 0.8],
+            "intensity": 1.2
+        },
+        {
             "type": "point",
-            "position": [-500.0, 500.0, 0.0],
+            "position": [-500.0, 200.0, 0.0],
             "color": [1.0, 0.0, 0.0],
-            "intensity": 1.0
+            "intensity": 0.5
         },
         {
             "type": "point",
-            "position": [500.0, 500.0, 0.0],
+            "position": [500.0, 200.0, 0.0],
             "color": [0.0, 0.0, 1.0],
-            "intensity": 1.0
-        },
-        {
-             "type": "point",
-             "position": [0.0, 500.0, -500.0],
-             "color": [0.0, 1.0, 0.0],
-             "intensity": 1.0
+            "intensity": 0.5
         }
     ],
     "objects": [
