@@ -7,20 +7,19 @@
         },
         "animation": {
             "camera_speed": 0.5,
-            "sun_speed": 0.3
-        }
-    },
-    "ambient_light": {
-        "color": [1.0, 1.0, 1.0],
-        "intensity": 0.1
-    },
-    "lights": [
-        {
-            "type": "directional",
+            "sun_speed": 0.0
+        },
+        "sky_light": {
             "direction": [-1.0, -1.0, -1.0],
             "color": [1.0, 0.95, 0.8],
             "intensity": 1.2
         },
+        "ambient": {
+            "color": [1.0, 1.0, 1.0],
+            "intensity": 0.1
+        }
+    },
+    "lights": [
         {
             "type": "point",
             "position": [-500.0, 200.0, 0.0],

@@ -2,9 +2,24 @@ cmake_minimum_required(VERSION 3.14)
 
 project(RayTracingDemo CXX)
 
+# Set Policies to suppress warnings
+if(POLICY CMP0069)
+    cmake_policy(SET CMP0069 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+endif()
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
+
+# Suppress deprecation warnings from dependencies
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+
 # Set C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Suppress warnings from external libraries
+add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 # Optimization and Build Speed Configuration
 # Enable Unity Build to reduce compile time by merging source files
@@ -30,7 +45,20 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/g-truc/glm.git
     GIT_TAG master
 )
+# Force GLM to be header only
+set(GLM_BUILD_LIBRARY OFF CACHE BOOL "Build dynamic/static library" FORCE)
+set(GLM_BUILD_TESTS OFF CACHE BOOL "Build the test programs" FORCE)
+
 FetchContent_MakeAvailable(glm)
+
+# If GLM is header only, it might not create a 'glm' target that we can link to easily 
+# in the way some projects expect (i.e. as a library).
+# But GLM CMake usually creates a 'glm' interface target if not building library.
+# Let's check if 'glm' target exists, otherwise create an alias or interface.
+if(NOT TARGET glm)
+    add_library(glm INTERFACE)
+    target_include_directories(glm INTERFACE ${glm_SOURCE_DIR})
+endif()
 
 # 2. SFML
 # We use the 2.6.x branch to ensure compatibility with existing code while getting updates.

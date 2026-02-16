@@ -1,0 +1,1 @@
+Always launch the program through run.bat. Never clear the build directory, to avoid long compile times. By default we run at 24 fps for 10 seconds.

@@ -14,8 +14,8 @@
 #include <sstream>
 #include <filesystem>
 #include <stb_image_write.h>
-#include "AviWriter.h"
 #include <cmath>
+#include <cstdlib>
 
 using namespace std;
 using namespace chrono_literals;
@@ -90,7 +90,8 @@ void SaveFrame()
     auto img = _renderTargetFinal->copyToImage();
     
     auto t = std::time(nullptr);
-    auto tm = *std::localtime(&t);
+    struct tm tm;
+    localtime_s(&tm, &t);
     std::ostringstream oss;
     oss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
     
@@ -271,7 +272,7 @@ int main(int argc, char **argv)
 {
     CLI::App app{"Ray Tracing Demo"};
 
-    std::string sceneFilePath = "scenes/default.json";
+    std::string sceneFilePath = "scenes/default.scene";
     int fps = 60;
     float runtime = 5.0f;
     bool singleFrame = false;
@@ -320,20 +321,21 @@ int main(int argc, char **argv)
                 std::filesystem::create_directory("output");
 
             auto t = std::time(nullptr);
-            auto tm = *std::localtime(&t);
+            struct tm tm;
+            localtime_s(&tm, &t);
             std::ostringstream oss;
             oss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
-            std::string videoFilename = "output/" + oss.str() + ".avi";
+            std::string timestamp = oss.str();
+            
+            // Create a temporary directory for frames
+            std::string framesDir = "output/" + timestamp + "_frames";
+            std::filesystem::create_directory(framesDir);
+            
+            std::string videoFilename = "output/" + timestamp + ".mp4";
 
             int width = TargetWidth;
             int height = TargetHeight;
             
-            AviWriter writer(videoFilename, width, height, fps);
-            if (!writer.IsOpen()) {
-                printf("Failed to open video file for writing: %s\n", videoFilename.c_str());
-                return 1;
-            }
-
             int totalFrames = static_cast<int>(fps * runtime);
             for (int i = 0; i < totalFrames; ++i)
             {
@@ -346,22 +348,98 @@ int main(int argc, char **argv)
 
                 _totalTime = static_cast<float>(i) / fps;
                 
-                printf("Rendering frame %d / %d (%.1f%%)\r", i + 1, totalFrames, 100.0f * (i + 1) / totalFrames);
-                fflush(stdout);
-
+                UpdateScene(_totalTime); // Update scene state for current time
                 Render();
                 _window.display(); // Optional: show progress
 
+                printf("Rendering frame %d / %d (%.1f%%)\r", i + 1, totalFrames, 100.0f * (i + 1) / totalFrames);
+                fflush(stdout);
+
                 // Capture frame for video
                 sf::Image img = _renderTargetFinal->copyToImage();
-                const sf::Uint8* pixels = img.getPixelsPtr();
-
-                // AviWriter handles RGBA (we assume alpha is ignored or writer handles it)
-                // stbi_write_jpg_to_func with 4 comp writes valid JPEG? Yes.
-                writer.WriteFrame(pixels, width * 4);
+                
+                // Save frame as PNG
+                std::ostringstream frameName;
+                frameName << framesDir << "/frame_" << std::setfill('0') << std::setw(4) << i << ".png";
+                std::string framePath = frameName.str();
+                
+                if (!stbi_write_png(framePath.c_str(), width, height, 4, img.getPixelsPtr(), width * 4))
+                {
+                    printf("\nFailed to save frame: %s\n", framePath.c_str());
+                }
             }
             
-            printf("\nVideo saved to %s\n", videoFilename.c_str());
+            printf("\nFrames rendered. Stitching video with ffmpeg...\n");
+            
+            // Construct ffmpeg command
+            // Try to use absolute path if simple 'ffmpeg' fails
+            std::string ffmpegPath = "ffmpeg";
+            
+            // Check if ffmpeg is in path
+            if (std::system("ffmpeg -version > nul 2>&1") != 0)
+            {
+                // Try to find it in LocalAppData
+                const char* localAppData = std::getenv("LOCALAPPDATA");
+                if (localAppData)
+                {
+                    // This is a bit of a hack, but it works for Winget installs
+                    // We iterate through Microsoft\WinGet\Packages looking for ffmpeg.exe
+                    try {
+                        std::string basePath = std::string(localAppData) + "\\Microsoft\\WinGet\\Packages";
+                        if (std::filesystem::exists(basePath))
+                        {
+                            for (const auto& entry : std::filesystem::recursive_directory_iterator(basePath))
+                            {
+                                if (entry.path().filename() == "ffmpeg.exe")
+                                {
+                                    ffmpegPath = entry.path().string();
+                                    printf("Found ffmpeg at: %s\n", ffmpegPath.c_str());
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        printf("Error searching for ffmpeg: %s\n", e.what());
+                    }
+                }
+            }
+
+            // ffmpeg -framerate <fps> -i <dir>/frame_%04d.png -c:v libx264 -pix_fmt yuv420p <output_file>.mp4
+            std::ostringstream cmd;
+            // Wrap the entire command in quotes for cmd.exe if it contains quoted arguments
+            // Actually, std::system just passes the string.
+            // If the executable path has spaces, it must be quoted.
+            // If the arguments have spaces, they must be quoted.
+            // "path to exe" "arg 1" "arg 2"
+            // This structure can be problematic for cmd.exe /S /C "command" logic.
+            // But usually just ensuring the exe is quoted works.
+            // Let's try adding "cmd /c " prefix explicitly to control quoting behavior.
+            std::ostringstream finalCmd;
+#ifdef _WIN32
+            finalCmd << "\"\"" << ffmpegPath << "\" -y -framerate " << fps 
+                     << " -i \"" << framesDir << "/frame_%04d.png\""
+                     << " -c:v libx264 -pix_fmt yuv420p \"" << videoFilename << "\"\"";
+#else
+            finalCmd << "\"" << ffmpegPath << "\" -y -framerate " << fps 
+                     << " -i \"" << framesDir << "/frame_%04d.png\""
+                     << " -c:v libx264 -pix_fmt yuv420p \"" << videoFilename << "\"";
+#endif
+            
+            printf("Running command: %s\n", finalCmd.str().c_str());
+            int ret = std::system(finalCmd.str().c_str());
+            
+            if (ret == 0)
+            {
+                printf("Video saved to %s\n", videoFilename.c_str());
+                
+                // Cleanup frames
+                printf("Cleaning up temporary frames...\n");
+                std::filesystem::remove_all(framesDir);
+            }
+            else
+            {
+                printf("ffmpeg failed with return code %d. Frames are kept in %s\n", ret, framesDir.c_str());
+            }
         }
 
     } catch (const std::exception& e) {

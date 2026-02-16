@@ -6,6 +6,7 @@
 #include "Scene.h"
 #include "GeometrySphere.h"
 #include "GeometryPlane.h"
+#include "GeometryTriangle.h"
 #include <fstream>
 #include <iostream>
 
@@ -29,25 +30,8 @@ public:
 
         auto scene = make_shared<Scene>();
 
-        // Load Ambient Light
-        if (j.contains("ambient_light"))
-        {
-            auto& ambient = j["ambient_light"];
-            if (ambient.contains("color"))
-            {
-                scene->AmbientLightColor = {
-                    ambient["color"][0].get<float>(),
-                    ambient["color"][1].get<float>(),
-                    ambient["color"][2].get<float>()
-                };
-            }
-            if (ambient.contains("intensity"))
-            {
-                scene->AmbientIntensity = ambient["intensity"].get<float>();
-            }
-        }
-
-        // Load Scene Settings (Camera & Animation)
+        // Load Scene Settings (Camera, Animation, Sky Light, Ambient)
+        bool hasDirectionalLight = false;
         if (j.contains("settings"))
         {
             auto& settings = j["settings"];
@@ -74,10 +58,68 @@ public:
                 if (anim.contains("sun_speed"))
                     scene->SunRotationSpeed = anim["sun_speed"];
             }
+
+            // Load Sky Light (formerly Directional Light)
+            if (settings.contains("sky_light"))
+            {
+                auto& sky = settings["sky_light"];
+                fvec3 dir = {
+                    sky["direction"][0].get<float>(),
+                    sky["direction"][1].get<float>(),
+                    sky["direction"][2].get<float>()
+                };
+                fvec3 color = {
+                    sky["color"][0].get<float>(),
+                    sky["color"][1].get<float>(),
+                    sky["color"][2].get<float>()
+                };
+                float intensity = sky["intensity"].get<float>();
+                
+                scene->SunLight = DirectionalLight(dir, color, intensity);
+                scene->InitialSunDirection = glm::normalize(dir);
+                scene->InitialSunIntensity = intensity;
+                hasDirectionalLight = true;
+            }
+
+            // Load Ambient Light
+            if (settings.contains("ambient"))
+            {
+                auto& ambient = settings["ambient"];
+                if (ambient.contains("color"))
+                {
+                    scene->AmbientLightColor = {
+                        ambient["color"][0].get<float>(),
+                        ambient["color"][1].get<float>(),
+                        ambient["color"][2].get<float>()
+                    };
+                }
+                if (ambient.contains("intensity"))
+                {
+                    scene->AmbientIntensity = ambient["intensity"].get<float>();
+                }
+            }
+        }
+
+        // Backward compatibility for ambient_light (if not in settings)
+        if (j.contains("ambient_light") && scene->AmbientIntensity == 0.0f) // Only if not set by settings
+        {
+            auto& ambient = j["ambient_light"];
+            if (ambient.contains("color"))
+            {
+                scene->AmbientLightColor = {
+                    ambient["color"][0].get<float>(),
+                    ambient["color"][1].get<float>(),
+                    ambient["color"][2].get<float>()
+                };
+            }
+            if (ambient.contains("intensity"))
+            {
+                scene->AmbientIntensity = ambient["intensity"].get<float>();
+            }
         }
 
         // Load Lights
-        bool hasDirectionalLight = false;
+        // bool hasDirectionalLight = false; // Already defined above
         if (j.contains("lights"))
         {
             for (const auto& lightData : j["lights"])
@@ -98,37 +140,13 @@ public:
                     float intensity = lightData["intensity"].get<float>();
                     scene->AddLight(new PointLight(pos, color, intensity));
                 }
-                else if (type == "directional")
-                {
-                    if (hasDirectionalLight)
-                    {
-                        cerr << "Warning: Multiple directional lights found. Only the first one will be used." << endl;
-                        continue;
-                    }
-                    
-                    fvec3 dir = {
-                        lightData["direction"][0].get<float>(),
-                        lightData["direction"][1].get<float>(),
-                        lightData["direction"][2].get<float>()
-                    };
-                    fvec3 color = {
-                        lightData["color"][0].get<float>(),
-                        lightData["color"][1].get<float>(),
-                        lightData["color"][2].get<float>()
-                    };
-                    float intensity = lightData["intensity"].get<float>();
-                    
-                    scene->SunLight = DirectionalLight(dir, color, intensity);
-                    scene->InitialSunDirection = glm::normalize(dir);
-                    scene->InitialSunIntensity = intensity;
-                    hasDirectionalLight = true;
-                }
+                // Directional light support removed from lights array. Use settings.sky_light instead.
             }
         }
         
         if (!hasDirectionalLight)
         {
-            cerr << "Warning: No directional light found in scene. Using default." << endl;
+            cerr << "Warning: No sky_light (formerly directional light) found in scene. Using default." << endl;
         }
 
         // Load Geometry
@@ -160,6 +178,34 @@ public:
                         objData["normal"][2].get<float>()
                     };
                     scene->AddGeometry(new GeometryPlane(origin, normal));
+                }
+                else if (type == "triangle")
+                {
+                    fvec3 v0 = {
+                        objData["v0"][0].get<float>(),
+                        objData["v0"][1].get<float>(),
+                        objData["v0"][2].get<float>()
+                    };
+                    fvec3 v1 = {
+                        objData["v1"][0].get<float>(),
+                        objData["v1"][1].get<float>(),
+                        objData["v1"][2].get<float>()
+                    };
+                    fvec3 v2 = {
+                        objData["v2"][0].get<float>(),
+                        objData["v2"][1].get<float>(),
+                        objData["v2"][2].get<float>()
+                    };
+                    fvec3 color = { 1.0f, 1.0f, 1.0f };
+                    if (objData.contains("color"))
+                    {
+                        color = {
+                            objData["color"][0].get<float>(),
+                            objData["color"][1].get<float>(),
+                            objData["color"][2].get<float>()
+                        };
+                    }
+                    scene->AddGeometry(new GeometryTriangle(v0, v1, v2, color));
                 }
             }
         }
