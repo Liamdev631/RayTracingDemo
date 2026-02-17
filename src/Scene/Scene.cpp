@@ -27,6 +27,29 @@ void Scene::AddLight(PointLight* light)
 	_lights.push_back(light);
 }
 
+int Scene::AddTexture(const string& filepath)
+{
+	auto img = make_shared<sf::Image>();
+	if (img->loadFromFile(filepath))
+	{
+		_textures.push_back(img);
+		printf("Loaded texture: %d from %s\n", (int)_textures.size() - 1, filepath.c_str());
+		return (int)_textures.size() - 1;
+	}
+	else
+	{
+		printf("Failed to load texture from %s\n", filepath.c_str());
+		return -1;
+	}
+}
+
+const sf::Image* Scene::GetTexture(int index) const
+{
+	if (index >= 0 && index < _textures.size())
+		return _textures[index].get();
+	return nullptr;
+}
+
 const vector<Geometry*>& Scene::GetGeometryCollection() const
 {
 	return _geometry;

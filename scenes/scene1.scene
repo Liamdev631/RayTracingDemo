@@ -1,0 +1,90 @@
+{
+    "settings": {
+        "camera": {
+            "position": [0.0, 300.0, 500.0],
+            "target": [0.0, 100.0, 0.0],
+            "fov": 60.0
+        },
+        "animation": {
+            "camera_speed": 0.2,
+            "sun_speed": 0.0
+        },
+        "sky_light": {
+            "direction": [-1.0, -1.0, -1.0],
+            "color": [1.0, 1.0, 1.0],
+            "intensity": 1.0
+        },
+        "ambient": {
+            "color": [1.0, 1.0, 1.0],
+            "intensity": 0.1
+        }
+    },
+    "lights": [
+        {
+            "type": "point",
+            "position": [200.0, 300.0, 200.0],
+            "color": [1.0, 0.8, 0.8],
+            "intensity": 0.8
+        }
+    ],
+    "objects": [
+        {
+            "type": "checker_circle",
+            "origin": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "radius": 500.0,
+            "roughness": 0.2,
+            "metallic": 0.4
+        },
+        {
+            "type": "triangle",
+            "v0": [-100.0, 0.0, 100.0],
+            "v1": [100.0, 0.0, 100.0],
+            "v2": [0.0, 200.0, 0.0],
+            "color": [1.0, 0.0, 0.0],
+            "roughness": 0.5,
+            "metallic": 0.0
+        },
+        {
+            "type": "triangle",
+            "v0": [100.0, 0.0, 100.0],
+            "v1": [100.0, 0.0, -100.0],
+            "v2": [0.0, 200.0, 0.0],
+            "color": [0.0, 0.0, 1.0],
+            "roughness": 0.1,
+            "metallic": 0.8
+        },
+        {
+            "type": "mesh",
+            "texture": "textures/awesomeface.png",
+            "triangles": [
+                {
+                    "v0": [-100, 0, -200],
+                    "v1": [100, 0, -200],
+                    "v2": [100, 200, -200],
+                    "uvs": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]],
+                    "color": [1.0, 1.0, 1.0]
+                },
+                {
+                    "v0": [-100, 0, -200],
+                    "v1": [100, 200, -200],
+                    "v2": [-100, 200, -200],
+                    "uvs": [[0.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
+                    "color": [1.0, 1.0, 1.0]
+                }
+            ]
+        },
+        {
+            "type": "cube",
+            "center": [250, 75.0, -32.0],
+            "size": 150.0,
+            "transform": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            "material": {
+                "albedo": "textures/TilesSquarePoolMixed001/TilesSquarePoolMixed001_COL_1K.jpg",
+                "normal": "textures/TilesSquarePoolMixed001/TilesSquarePoolMixed001_NRM_1K.jpg",
+                "gloss": "textures/TilesSquarePoolMixed001/TilesSquarePoolMixed001_GLOSS_1K.jpg",
+                "metallic": 0.0
+            }
+        }
+    ]
+}

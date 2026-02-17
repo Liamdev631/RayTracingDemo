@@ -120,6 +120,8 @@ target_include_directories(RayTracingDemo PRIVATE
     ${CMAKE_SOURCE_DIR}/src/Core
     ${CMAKE_SOURCE_DIR}/src/Renderer
     ${CMAKE_SOURCE_DIR}/src/Scene
+    ${CMAKE_SOURCE_DIR}/src/Scene/Geometry
+    ${CMAKE_SOURCE_DIR}/src/Primitives
 )
 
 # Link Libraries

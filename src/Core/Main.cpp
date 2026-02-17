@@ -1,7 +1,9 @@
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include "SceneRenderer.h"
-#include "GeometryGroup.h"
+#include "../Primitives/Group.h"
+#include "../Primitives/Sphere.h"
+#include "../Primitives/CheckerCircle.h"
 #include <thread>
 #include <chrono>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -225,10 +227,10 @@ void SetupScene(const std::string& sceneFile)
                 glm::linearRand<float>(-1200, 1200),
                 glm::linearRand<float>(-1200, 1200) };
             float rad = glm::linearRand<float>(80, 240);
-            _scene->AddGeometry(new GeometrySphere(pos, rad));
+            _scene->AddGeometry(new Sphere(pos, rad));
         }
         
-        _scene->AddGeometry(new GeometryPlane({0,0,0}, {0,1,0}));
+        _scene->AddGeometry(new CheckerCircle({0,0,0}, {0,1,0}));
     }
     else
     {
