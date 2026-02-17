@@ -38,5 +38,8 @@ public:
      * @param renderTarget Texture to write the rendered image into.
      */
     void Render(unique_ptr<sf::Texture>& renderTarget);
+
+private:
+    glm::fvec3 TraceRay(const Scene* scene, const Ray& ray, int depth);
 };
 

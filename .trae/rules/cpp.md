@@ -13,7 +13,6 @@ You are a senior C++ developer with expertise in modern C++ (C++20), STL, and sy
 - Always declare the type of each variable and function (parameters and return value).
 - Create necessary types and classes.
 - Use Doxygen style comments to document public classes and methods. Never use @brief for methods. Always explain the purpose and behavior of the method, in addition to any parameters, return values, and exceptions.
-- Don't leave blank lines within a function except for readability.
 - Follow the one-definition rule (ODR).
 
 ## Nomenclature

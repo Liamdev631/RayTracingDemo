@@ -22,6 +22,8 @@ struct Hit
 	float Roughness = 0.5f;
 	/** @brief Surface metallic value used for PBR shading. */
 	float Metallic = 0.0f;
+	/** @brief Surface transmission/alpha value (0 = opaque, 1 = transparent). */
+	float Alpha = 0.0f;
 	/** @brief Geometry that produced the hit. */
 	const Geometry* HitGeometry = nullptr;
 
@@ -38,6 +40,7 @@ struct Hit
 		Color = other.Color;
 		Roughness = other.Roughness;
 		Metallic = other.Metallic;
+		Alpha = other.Alpha;
 		HitGeometry = other.HitGeometry;
 		return *this;
 	}

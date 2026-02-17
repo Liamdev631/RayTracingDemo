@@ -27,4 +27,6 @@ struct PBRMaterial
     const sf::Image* metallicMap = nullptr;
     /** @brief Optional gloss map where roughness = 1 - gloss. */
     const sf::Image* glossMap = nullptr;
+    /** @brief Optional alpha/transmission map. */
+    const sf::Image* alphaMap = nullptr;
 };

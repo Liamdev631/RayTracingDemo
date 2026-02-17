@@ -94,7 +94,8 @@ public:
 	 * @param outAlbedo Albedo color at the position.
 	 * @param outRoughness Roughness scalar at the position.
 	 * @param outMetallic Metallic scalar at the position.
+	 * @param outAlpha Alpha scalar at the position.
 	 * @param outNormal Shading normal at the position.
 	 */
-	virtual void GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, fvec3& outNormal) const override;
+	virtual void GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, float& outAlpha, fvec3& outNormal) const override;
 };

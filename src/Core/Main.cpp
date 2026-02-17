@@ -11,35 +11,31 @@
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
-#include <stb_image_write.h>
 #include <cmath>
 #include <cstdlib>
 
 using namespace std;
 using namespace chrono_literals;
 
-int TargetWidth = 960;
-int TargetHeight = 540;
+int resolutionX = 640;
+int resolutionY = 480;
+int frameCount = 0;
 
 // Global variables to replace Program class state
-sf::RenderWindow _window;
+std::unique_ptr<sf::RenderWindow> _window;
 std::unique_ptr<SceneRenderer> _renderer;
 std::shared_ptr<Scene> _scene;
-sf::RectangleShape _imageBox;
+std::unique_ptr<sf::RectangleShape> _imageBox;
 unique_ptr<sf::Texture> _renderTargetFinal;
 float _totalTime = 0.0f;
 
-
-
 void SaveFrame()
 {
+    if (!_renderTargetFinal) return;
     auto img = _renderTargetFinal->copyToImage();
     
-    auto t = std::time(nullptr);
-    struct tm tm;
-    localtime_s(&tm, &t);
     std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
+    oss << "_" << std::setw(4) << std::setfill('0') << frameCount++;    
     
     if (!std::filesystem::exists("output"))
     {
@@ -48,16 +44,7 @@ void SaveFrame()
 
     std::string filename = "output/" + oss.str() + ".png";
 
-    int result = stbi_write_png(
-        filename.c_str(), 
-        img.getSize().x, 
-        img.getSize().y, 
-        4, 
-        img.getPixelsPtr(), 
-        img.getSize().x * 4
-    );
-
-    if (result)
+    if (img.saveToFile(filename))
         printf("Saved frame to %s\n", filename.c_str());
     else
         printf("Failed to save frame to %s\n", filename.c_str());
@@ -65,15 +52,16 @@ void SaveFrame()
 
 void ProcessEvent(const sf::Event& ev) noexcept
 {
+    if (!_window) return;
     if (ev.type == sf::Event::Closed)
     {
-        _window.close();
+        _window->close();
     }
     if (ev.type == sf::Event::KeyPressed)
     {
         if (ev.key.code == sf::Keyboard::Escape)
         {
-            _window.close();
+            _window->close();
         }
         else if (ev.key.code == sf::Keyboard::Space)
         {
@@ -119,16 +107,21 @@ void UpdateScene(float time)
 
 void Render()
 {
-    _window.clear(sf::Color::Magenta);
+    if (!_window) return;
+    _window->clear(sf::Color::Magenta);
     UpdateScene(_totalTime);
     if (_renderer) _renderer->Render(_renderTargetFinal);
 
-    _imageBox.setTexture(_renderTargetFinal.get());
-    _window.draw(_imageBox);
+    if (_imageBox && _renderTargetFinal)
+    {
+        _imageBox->setTexture(_renderTargetFinal.get());
+        _window->draw(*_imageBox);
+    }
 }
 
 void SetupScene(const std::string& sceneFile)
 {
+    // ... (unchanged logic, just ensuring _scene usage is consistent)
     srand(static_cast<unsigned int>(time(0)));
 
     if (sceneFile.empty())
@@ -155,66 +148,96 @@ void SetupWindow()
     settings.antialiasingLevel = 16;
     settings.depthBits = 16;
     settings.stencilBits = 0;
-    _window.create(sf::VideoMode(1920, 1080), "Ray Tracing Demo", sf::Style::Default, settings);
-    _window.setVerticalSyncEnabled(true);
-    _window.setActive(true);
+    
+    _window = std::make_unique<sf::RenderWindow>(sf::VideoMode(resolutionX, resolutionY), "Ray Tracing Demo", sf::Style::Default, settings);
+    _window->setVerticalSyncEnabled(true);
+    _window->setActive(true);
 
-    _imageBox.setSize({ 1920, 1080 });
-    _imageBox.setPosition({ 0, 0 });
-    _imageBox.setFillColor(sf::Color::White);
+    _imageBox = std::make_unique<sf::RectangleShape>();
+    _imageBox->setSize({ (float)resolutionX, (float)resolutionY }); 
+    _imageBox->setPosition({ 0, 0 });
+    _imageBox->setFillColor(sf::Color::White);
 
     _renderTargetFinal = make_unique<sf::Texture>();
-    _renderTargetFinal->create(TargetWidth, TargetHeight);
+    _renderTargetFinal->create(resolutionX, resolutionY);
     
-    _imageBox.setTexture(_renderTargetFinal.get());
+    _imageBox->setTexture(_renderTargetFinal.get());
 
-    _renderer = std::make_unique<SceneRenderer>(sf::Vector2u((unsigned int)TargetWidth, (unsigned int)TargetHeight));
+    _renderer = std::make_unique<SceneRenderer>(sf::Vector2u((unsigned int)resolutionX, (unsigned int)resolutionY));
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    CLI::App app{"Ray Tracing Demo"};
-
-    std::string sceneFilePath = "scenes/default.scene";
-    int fps = 60;
-    float runtime = 5.0f;
+    std::cout << "RayTracingDemo Starting..." << std::endl;
+    std::flush(std::cout);
+    CLI::App app{ "Ray Tracing Demo" };
+    
+    std::string scenePath = "scenes/scene.json";
+    int fps = 24;
+    int runtime = 10;
     bool singleFrame = false;
 
-    app.add_option("-s,--scene", sceneFilePath, "Path to the scene JSON file");
-    app.add_option("--fps", fps, "Frames per second for video generation")->default_val(60);
-    app.add_option("--runtime", runtime, "Runtime in seconds for video generation")->default_val(5.0f);
+    app.add_option("--scene", scenePath, "Path to scene file");
+    app.add_option("--width", resolutionX, "Output width");
+    app.add_option("--height", resolutionY, "Output height");
+    app.add_option("--fps", fps, "Frames per second");
+    app.add_option("--runtime", runtime, "Runtime in seconds");
     app.add_flag("--single-frame", singleFrame, "Run in interactive single-frame mode");
-    app.add_option("--width", TargetWidth, "Output video width")->default_val(960);
-    app.add_option("--height", TargetHeight, "Output video height")->default_val(540);
-
+    
     CLI11_PARSE(app, argc, argv);
 
+    std::cout << "Loading scene: " << scenePath << std::endl;
+    
+    if (scenePath.empty() || !std::filesystem::exists(scenePath))
+    {
+        std::cerr << "Error: Scene file not found: " << scenePath << std::endl;
+        return 1;
+    }
+
+    // Initialize Window and Renderer resources
     try {
         SetupWindow();
-        SetupScene(sceneFilePath);
 
-        if (singleFrame)
+        try {
+            _scene = SceneLoader::LoadScene(scenePath);
+        } catch (const std::exception& e) {
+            std::cerr << "Exception loading scene: " << e.what() << std::endl;
+            return 1;
+        }
+
+    if (!_scene)
+    {
+        std::cerr << "Failed to load scene." << std::endl;
+        return 1;
+    }
+    
+    if (_renderer) _renderer->SetScene(_scene);
+    
+    std::cout << "Scene loaded successfully." << std::endl;
+
+    // Logic continues below (reusing existing code structure where possible)
+    if (singleFrame)
         {
             // Interactive mode
             printf("Starting interactive mode.\n");
             sf::Event ev = sf::Event();
             sf::Clock clock;
-            while (_window.isOpen())
+            while (_window && _window->isOpen())
             {
-                while (_window.pollEvent(ev))
+                while (_window->pollEvent(ev))
                     ProcessEvent(ev);
 
                 float dt = clock.restart().asSeconds();
                 _totalTime += dt;
 
                 Render();
-                _window.display();
+                if (_window) _window->display();
             }
         }
         else
         {
             // Video generation mode
-            printf("Starting video generation: %d fps, %.2f seconds.\n", fps, runtime);
+            printf("Starting video generation: %d fps, %.2f seconds.\n", fps, (double)runtime);
             
             if (!std::filesystem::exists("output"))
                 std::filesystem::create_directory("output");
@@ -232,26 +255,26 @@ int main(int argc, char **argv)
             
             std::string videoFilename = "output/" + timestamp + ".mp4";
 
-            int width = TargetWidth;
-            int height = TargetHeight;
+            int width = resolutionX;
+            int height = resolutionY;
             
             int totalFrames = static_cast<int>(fps * runtime);
             for (int i = 0; i < totalFrames; ++i)
             {
-                if (!_window.isOpen()) break;
+                if (!_window || !_window->isOpen()) break;
 
                 // Handle window events just to keep OS happy (and allow closing)
                 sf::Event ev;
-                while (_window.pollEvent(ev))
+                while (_window->pollEvent(ev))
                     ProcessEvent(ev);
 
                 _totalTime = static_cast<float>(i) / fps;
                 
                 UpdateScene(_totalTime); // Update scene state for current time
                 Render();
-                _window.display(); // Optional: show progress
+                if (_window) _window->display(); // Optional: show progress
 
-                printf("Rendering frame %d / %d (%.1f%%)\r", i + 1, totalFrames, 100.0f * (i + 1) / totalFrames);
+                printf("\rRendering frame %d / %d (%.1f%%)", i + 1, totalFrames, 100.0f * (i + 1) / totalFrames);
                 fflush(stdout);
 
                 // Capture frame for video
@@ -259,10 +282,10 @@ int main(int argc, char **argv)
                 
                 // Save frame as PNG
                 std::ostringstream frameName;
-                frameName << framesDir << "/frame_" << std::setfill('0') << std::setw(4) << i << ".png";
+                frameName << framesDir << "/frame_" << std::setfill('0') << std::setw(4) << frameCount++ << ".png";
                 std::string framePath = frameName.str();
                 
-                if (!stbi_write_png(framePath.c_str(), width, height, 4, img.getPixelsPtr(), width * 4))
+                if (!img.saveToFile(framePath))
                 {
                     printf("\nFailed to save frame: %s\n", framePath.c_str());
                 }

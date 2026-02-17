@@ -38,10 +38,11 @@ bool Sphere::IntersectsAny(const Ray& ray) const
 	return glm::intersectRaySphere<fvec3>(ray.position, ray.direction, center, radius, dummyHit.Position, dummyHit.Normal);
 }
 
-void Sphere::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, fvec3& outNormal) const
+void Sphere::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, float& outAlpha, fvec3& outNormal) const
 {
 	outAlbedo = { 0.8f, 0.8f, 0.8f };
 	outRoughness = roughness;
 	outMetallic = metallic;
+	outAlpha = 0.0f; // Opaque
 	outNormal = glm::normalize(p - center);
 }

@@ -58,12 +58,13 @@ bool CheckerCircle::IntersectsAny(const Ray& ray) const
 	return false;
 }
 
-void CheckerCircle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, fvec3& outNormal) const
+void CheckerCircle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, float& outAlpha, fvec3& outNormal) const
 {
 	bool check = (int(floor(p.x / 100.0f)) + int(floor(p.z / 100.0f))) % 2 == 0;
 	outAlbedo = check ? fvec3(0.9f) : fvec3(0.5f);
 	// White tiles (check) get the base roughness (reflective), Dark tiles get 1.0 (matte)
 	outRoughness = check ? roughness : 0.9f; 
 	outMetallic = metallic;
+	outAlpha = 0.0f; // Opaque
 	outNormal = normal;
 }

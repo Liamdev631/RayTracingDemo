@@ -10,6 +10,15 @@ endif()
 if(POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
 endif()
+# Fix for Assimp CMake Warning (dev) about ADD_CUSTOM_COMMAND
+if(POLICY CMP0175)
+    cmake_policy(SET CMP0175 OLD)
+    set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)
+endif()
+
+# Enable warnings as errors for CMake (User Request)
+set(CMAKE_ERROR_ON_DEV_WARNING ON)
+set(CMAKE_ERROR_ON_DEPRECATED ON)
 
 # Suppress deprecation warnings from dependencies
 set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
@@ -23,7 +32,7 @@ add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 # Optimization and Build Speed Configuration
 # Enable Unity Build to reduce compile time by merging source files
-set(CMAKE_UNITY_BUILD ON)
+set(CMAKE_UNITY_BUILD OFF)
 
 # Enable Interprocedural Optimization (Link Time Optimization) if supported for performance
 include(CheckIPOSupported)
@@ -109,6 +118,34 @@ endif()
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 
+# 6. Assimp
+message(STATUS "Fetching Assimp...")
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL_PDB OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
+
+# Disable FBX, Enable OBJ (User Request)
+set(ASSIMP_BUILD_FBX_IMPORTER OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY https://github.com/assimp/assimp.git
+    GIT_TAG v5.4.3
+)
+
+# Suppress dev warnings for Assimp to avoid CMP0175 issues crashing the build
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS_OLD ${CMAKE_SUPPRESS_DEVELOPER_WARNINGS})
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE BOOL "Suppress dev warnings" FORCE)
+
+FetchContent_MakeAvailable(assimp)
+
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ${CMAKE_SUPPRESS_DEVELOPER_WARNINGS_OLD} CACHE BOOL "Suppress dev warnings" FORCE)
+
 # Define Sources
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.h" "src/*.hpp")
 
@@ -129,9 +166,9 @@ target_include_directories(RayTracingDemo PRIVATE
 # But via FetchContent/add_subdirectory, they might be SFML::Graphics etc. or sfml-graphics
 # Official SFML CMake defines targets as sfml-graphics, sfml-window, sfml-system (and aliases SFML::Graphics etc.)
 if(TARGET SFML::Graphics)
-    target_link_libraries(RayTracingDemo PRIVATE glm::glm SFML::Graphics SFML::Window SFML::System nlohmann_json::nlohmann_json CLI11::CLI11 stb)
+    target_link_libraries(RayTracingDemo PRIVATE glm::glm SFML::Graphics SFML::Window SFML::System nlohmann_json::nlohmann_json CLI11::CLI11 stb assimp::assimp)
 else()
-    target_link_libraries(RayTracingDemo PRIVATE glm::glm sfml-graphics sfml-window sfml-system nlohmann_json::nlohmann_json CLI11::CLI11 stb)
+    target_link_libraries(RayTracingDemo PRIVATE glm::glm sfml-graphics sfml-window sfml-system nlohmann_json::nlohmann_json CLI11::CLI11 assimp::assimp)
 endif()
 
 # Compiler Options for Performance

@@ -35,12 +35,14 @@ void SceneRenderer::Render(unique_ptr<sf::Texture>& renderTarget)
 	const unsigned int rowsPerThread = _frameSize.y / numThreads;
 	auto scene = _currentScene.lock();
 	if (!scene) return;
+
 	// Camera setup
 	glm::vec3 cameraPosition = scene->CameraPosition;
 	glm::vec3 cameraTarget = scene->CameraTarget;
 	float fov = scene->CameraFOV;
 	glm::vec3 up(0, 1, 0);
 	glm::vec3 forward = glm::normalize(cameraTarget - cameraPosition);
+
 	// Handle case where forward is parallel to up (e.g. looking straight down)
 	if (glm::abs(glm::dot(forward, up)) > 0.99f)
 		up = glm::vec3(0, 0, 1); // Use Z as up if looking along Y
@@ -48,6 +50,7 @@ void SceneRenderer::Render(unique_ptr<sf::Texture>& renderTarget)
 	glm::vec3 cameraUp = glm::cross(right, forward);
 	float aspectRatio = (float)_frameSize.x / (float)_frameSize.y;
 	float scale = tan(glm::radians(fov * 0.5f));
+
 	// Safer to write to a raw buffer then load.
 	std::vector<sf::Uint8> rawPixels(_frameSize.x * _frameSize.y * 4);
 	auto renderRow = [&](unsigned startY, unsigned endY) {
@@ -56,10 +59,7 @@ void SceneRenderer::Render(unique_ptr<sf::Texture>& renderTarget)
 		std::uniform_real_distribution<float> dis(0.0f, 1.0f);
 
 		Ray currentRay = Ray();
-		Hit outHit;
-		fvec3 cumulativeColor;
-		fvec3 throughput;
-
+		
 		constexpr int N = (Constants::SAMPLING_METHOD == Constants::SamplingType::Stratified) ? Constants::STRATIFIED_SAMPLES : 1;
 		constexpr float invN = (Constants::SAMPLING_METHOD == Constants::SamplingType::Stratified) ? (1.0f / static_cast<float>(Constants::STRATIFIED_SAMPLES)) : 1.0f;
 
@@ -90,107 +90,8 @@ void SceneRenderer::Render(unique_ptr<sf::Texture>& renderTarget)
 						float y_ndc = (1.0f - 2.0f * (y + v_offset) / _frameSize.y) * scale; // Flip Y for image coordinates
 						currentRay.position = cameraPosition;
 						currentRay.direction = glm::normalize(forward + right * x_ndc + cameraUp * y_ndc);
-						cumulativeColor = { 0, 0, 0 };
-						throughput = { 1, 1, 1 };
-						// Local ray for recursion
-						Ray traceRay = currentRay;
-						for (int depth = 0; depth < Constants::MAX_BOUNCE_COUNT; depth++)
-						{
-							bool hit = scene->Intersects(traceRay, outHit);
-							if (!hit) 
-							{
-								// Sky color (very simple gradient or constant)
-								cumulativeColor += throughput * fvec3(0.1f, 0.1f, 0.3f);
-								break;
-							}
-							// PBR Attributes Retrieval
-							fvec3 albedo = outHit.Color;
-							fvec3 normal = outHit.Normal;
-							float roughness = outHit.Roughness;
-							float metallic = outHit.Metallic;
-							if (outHit.HitGeometry)
-							{
-								outHit.HitGeometry->GetPBR(outHit.Position, albedo, roughness, metallic, normal);
-							}
-							// Direct Lighting Accumulator
-							fvec3 directLight = { 0, 0, 0 };
-							// Ambient
-							directLight += albedo * scene->AmbientLightColor * scene->AmbientIntensity;
-							// Directional Light (Sun)
-							fvec3 lightDir = -scene->SunLight.Direction; // Direction TO light
-							float diff = glm::max(glm::dot(normal, lightDir), 0.0f);
-							// Shadow check for directional light
-							bool inShadow = false;
-							Ray shadowRay;
-							shadowRay.position = outHit.Position + normal * Constants::SHADOW_BIAS; // Use geometric normal for bias
-							shadowRay.direction = lightDir;
-							if (scene->IntersectsAny(shadowRay))
-								inShadow = true;
-							if (!inShadow)
-							{
-								// Diffuse
-								// For metals, diffuse is 0 (all light is specular reflection)
-								fvec3 diffuseColor = albedo * (1.0f - metallic);
-								directLight += diffuseColor * scene->SunLight.Color * scene->SunLight.Intensity * diff;
-								// Specular (Blinn-Phong)
-								fvec3 viewDir = glm::normalize(-traceRay.direction);
-								fvec3 halfwayDir = glm::normalize(lightDir + viewDir);
-								// Map roughness to specular power
-								float specPower = glm::mix(128.0f, 2.0f, roughness * roughness); 
-								float spec = glm::pow(glm::max(glm::dot(normal, halfwayDir), 0.0f), specPower);
-								// Specular color
-								// Dielectric: White (0.04)
-								// Metal: Albedo
-								fvec3 specColor = glm::mix(fvec3(0.04f), albedo, metallic);
-								directLight += specColor * scene->SunLight.Color * scene->SunLight.Intensity * spec;
-							}
-							// Point Lights
-							for (auto* light : scene->GetLightCollection())
-							{
-								fvec3 L = light->Position - outHit.Position;
-								float dist = glm::length(L);
-								L = glm::normalize(L);
-								float atten = 1.0f / (1.0f + 0.1f * dist + 0.01f * dist * dist);
-								float pDiff = glm::max(glm::dot(normal, L), 0.0f);
-								Ray pShadowRay;
-								pShadowRay.position = outHit.Position + normal * Constants::SHADOW_BIAS;
-								pShadowRay.direction = L;
-								Hit shadowHit;
-								bool pInShadow = false;
-								if (scene->Intersects(pShadowRay, shadowHit))
-								{
-									if (shadowHit.Distance < dist)
-										pInShadow = true; // In shadow
-								}
-								if (!pInShadow)
-								{
-									// Diffuse
-									fvec3 diffuseColor = albedo * (1.0f - metallic);
-									directLight += diffuseColor * light->Color * light->Intensity * pDiff * atten;
-									// Specular
-									fvec3 viewDir = glm::normalize(-traceRay.direction);
-									fvec3 halfwayDir = glm::normalize(L + viewDir);
-									float specPower = glm::mix(128.0f, 2.0f, roughness * roughness);
-									float spec = glm::pow(glm::max(glm::dot(normal, halfwayDir), 0.0f), specPower);
-									fvec3 specColor = glm::mix(fvec3(0.04f), albedo, metallic);
-									directLight += specColor * light->Color * light->Intensity * spec * atten;
-								}
-							}
-							// Accumulate direct lighting
-							cumulativeColor += throughput * directLight;
-							// Calculate Fresnel for reflection
-							fvec3 F0 = glm::mix(fvec3(0.04f), albedo, metallic);
-							fvec3 viewDir = glm::normalize(-traceRay.direction);
-							float cosTheta = glm::clamp(glm::dot(normal, viewDir), 0.0f, 1.0f);
-							fvec3 F = F0 + (fvec3(1.0f) - F0) * std::pow(1.0f - cosTheta, 5.0f);
-							// Update throughput for next bounce (Reflection)
-							// Attenuate by roughness to simulate microfacet loss in single-ray approximation
-							throughput *= F * (1.0f - roughness);
-							if (glm::length(throughput) < 0.01f) break;
-							traceRay.position = outHit.Position + normal * Constants::SHADOW_BIAS;
-							traceRay.direction = glm::reflect(traceRay.direction, normal);
-						}
-						pixelColor += cumulativeColor;
+						
+						pixelColor += TraceRay(scene.get(), currentRay, 0);
 					}
 				}
 				pixelColor /= (float)(N * N);
@@ -215,4 +116,129 @@ void SceneRenderer::Render(unique_ptr<sf::Texture>& renderTarget)
 	}
 	buffer.create(_frameSize.x, _frameSize.y, rawPixels.data());
 	renderTarget->loadFromImage(buffer);
+}
+
+glm::fvec3 SceneRenderer::TraceRay(const Scene* scene, const Ray& ray, int depth)
+{
+	if (depth >= Constants::MAX_BOUNCE_COUNT)
+		return { 0, 0, 0 };
+
+	Hit outHit;
+	if (!scene->Intersects(ray, outHit))
+	{
+		// Sky color
+		return fvec3(0.1f, 0.1f, 0.3f);
+	}
+
+	// PBR Attributes Retrieval
+	fvec3 albedo = outHit.Color;
+	fvec3 normal = outHit.Normal;
+	float roughness = outHit.Roughness;
+	float metallic = outHit.Metallic;
+	float alpha = outHit.Alpha;
+
+	if (outHit.HitGeometry)
+	{
+		outHit.HitGeometry->GetPBR(outHit.Position, albedo, roughness, metallic, alpha, normal);
+	}
+
+	// Direct Lighting Accumulator
+	fvec3 directLight = { 0, 0, 0 };
+	// Ambient
+	directLight += albedo * scene->AmbientLightColor * scene->AmbientIntensity;
+
+	// Directional Light (Sun)
+	fvec3 lightDir = -scene->SunLight.Direction; // Direction TO light
+	float diff = glm::max(glm::dot(normal, lightDir), 0.0f);
+	
+	// Shadow check for directional light
+	bool inShadow = false;
+	Ray shadowRay;
+	shadowRay.position = outHit.Position + normal * Constants::SHADOW_BIAS; // Use geometric normal for bias
+	shadowRay.direction = lightDir;
+	if (scene->IntersectsAny(shadowRay))
+		inShadow = true;
+		
+	if (!inShadow)
+	{
+		// Diffuse
+		fvec3 diffuseColor = albedo * (1.0f - metallic);
+		directLight += diffuseColor * scene->SunLight.Color * scene->SunLight.Intensity * diff;
+		
+		// Specular (Blinn-Phong)
+		fvec3 viewDir = glm::normalize(-ray.direction);
+		fvec3 halfwayDir = glm::normalize(lightDir + viewDir);
+		float specPower = glm::mix(128.0f, 2.0f, roughness * roughness);
+		float spec = glm::pow(glm::max(glm::dot(normal, halfwayDir), 0.0f), specPower);
+		fvec3 specColor = glm::mix(fvec3(0.04f), albedo, metallic);
+		directLight += specColor * scene->SunLight.Color * scene->SunLight.Intensity * spec;
+	}
+
+	// Point Lights
+	for (auto* light : scene->GetLightCollection())
+	{
+		fvec3 L = light->Position - outHit.Position;
+		float dist = glm::length(L);
+		L = glm::normalize(L);
+		float atten = 1.0f / (1.0f + 0.1f * dist + 0.01f * dist * dist);
+		float pDiff = glm::max(glm::dot(normal, L), 0.0f);
+		Ray pShadowRay;
+		pShadowRay.position = outHit.Position + normal * Constants::SHADOW_BIAS;
+		pShadowRay.direction = L;
+		Hit shadowHit;
+		bool pInShadow = false;
+		if (scene->Intersects(pShadowRay, shadowHit))
+		{
+			if (shadowHit.Distance < dist)
+				pInShadow = true; // In shadow
+		}
+		if (!pInShadow)
+		{
+			// Diffuse
+			fvec3 diffuseColor = albedo * (1.0f - metallic);
+			directLight += diffuseColor * light->Color * light->Intensity * pDiff * atten;
+			// Specular
+			fvec3 viewDir = glm::normalize(-ray.direction);
+			fvec3 halfwayDir = glm::normalize(L + viewDir);
+			float specPower = glm::mix(128.0f, 2.0f, roughness * roughness);
+			float spec = glm::pow(glm::max(glm::dot(normal, halfwayDir), 0.0f), specPower);
+			fvec3 specColor = glm::mix(fvec3(0.04f), albedo, metallic);
+			directLight += specColor * light->Color * light->Intensity * spec * atten;
+		}
+	}
+
+	// Calculate Fresnel for reflection
+	fvec3 F0 = glm::mix(fvec3(0.04f), albedo, metallic);
+	fvec3 viewDir = glm::normalize(-ray.direction);
+	float cosTheta = glm::clamp(glm::dot(normal, viewDir), 0.0f, 1.0f);
+	fvec3 F = F0 + (fvec3(1.0f) - F0) * std::pow(1.0f - cosTheta, 5.0f);
+
+	// Reflection Ray
+	Ray reflectionRay;
+	reflectionRay.position = outHit.Position + normal * Constants::SHADOW_BIAS;
+	reflectionRay.direction = glm::reflect(ray.direction, normal);
+
+	// Check for Transparency
+	if (alpha < 0.99f)
+	{
+		// Transmitted Ray (continue through)
+		Ray transmissionRay;
+		transmissionRay.position = outHit.Position + ray.direction * Constants::SHADOW_BIAS; // Push forward
+		transmissionRay.direction = ray.direction;
+
+		fvec3 transmittedColor = TraceRay(scene, transmissionRay, depth + 1);
+		fvec3 reflectedColor = TraceRay(scene, reflectionRay, depth + 1);
+		
+		// Blend based on Alpha
+		// Surface component (Direct + Reflection)
+		fvec3 surfaceColor = directLight + reflectedColor * F * (1.0f - roughness);
+		
+		return glm::mix(transmittedColor, surfaceColor, alpha);
+	}
+	else
+	{
+		// Opaque
+		fvec3 reflectedColor = TraceRay(scene, reflectionRay, depth + 1);
+		return directLight + reflectedColor * F * (1.0f - roughness);
+	}
 }

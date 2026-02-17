@@ -11,8 +11,11 @@
 #include "../Primitives/Mesh.h"
 #include "../Primitives/Cube.h"
 #include "Material.h"
+#include "MeshLoader.h"
 #include <fstream>
 #include <iostream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 using json = nlohmann::json;
 using namespace std;
@@ -99,7 +102,6 @@ private:
             {
                 if (m["albedo"].is_string())
                 {
-                    cout << "Loading albedo texture: " << m["albedo"] << endl;
                     mat->albedoMap = GetOrLoadTexture(scene, cache, m["albedo"]);
                 }
                 else if (m["albedo"].is_array())
@@ -109,7 +111,7 @@ private:
             // Color (inside material)
             if (m.contains("color"))
             {
-                 mat->albedoColor = {
+                mat->albedoColor = {
                     m["color"][0].get<float>(),
                     m["color"][1].get<float>(),
                     m["color"][2].get<float>()
@@ -171,27 +173,27 @@ public:
         auto scene = make_shared<Scene>();
         std::map<string, int> textureCache;
 
-        // Load Scene Settings (Camera, Animation, Sky Light, Ambient)
-        bool hasDirectionalLight = false;
-        if (j.contains("settings"))
-        {
-            auto& settings = j["settings"];
-            if (settings.contains("camera"))
-            {
-                auto& cam = settings["camera"];
-                if (cam.contains("position")) {
-                    scene->CameraPosition = { cam["position"][0], cam["position"][1], cam["position"][2] };
-                    scene->InitialCameraPosition = scene->CameraPosition;
+                // Load Scene Settings (Camera, Animation, Sky Light, Ambient)
+                bool hasDirectionalLight = false;
+                if (j.contains("settings"))
+                {
+                    auto& settings = j["settings"];
+                    if (settings.contains("camera"))
+                {
+                    auto& cam = settings["camera"];
+                    if (cam.contains("position")) {
+                        scene->CameraPosition = { cam["position"][0], cam["position"][1], cam["position"][2] };
+                        scene->InitialCameraPosition = scene->CameraPosition;
+                    }
+                    if (cam.contains("target")) {
+                        scene->CameraTarget = { cam["target"][0], cam["target"][1], cam["target"][2] };
+                    }
+                    if (cam.contains("fov")) {
+                        scene->CameraFOV = cam["fov"].get<float>();
+                    }
                 }
-                if (cam.contains("target")) {
-                    scene->CameraTarget = { cam["target"][0], cam["target"][1], cam["target"][2] };
-                }
-                if (cam.contains("fov")) {
-                    scene->CameraFOV = cam["fov"].get<float>();
-                }
-            }
-            
-            if (settings.contains("animation"))
+                
+                if (settings.contains("animation"))
             {
                 auto& anim = settings["animation"];
                 if (anim.contains("camera_speed"))
@@ -386,6 +388,84 @@ public:
                     vector<Triangle> triangles;
                     auto mat = ParseMaterial(objData, scene.get(), textureCache);
 
+                    if (objData.contains("file"))
+                    {
+                        string filePath = objData["file"];
+                        auto loadedTriangles = MeshLoader::LoadMesh(filePath);
+                        
+                        // Apply transforms if present
+                        glm::mat4 transform(1.0f);
+                        bool hasTransform = false;
+
+                        // Position
+                        if (objData.contains("position"))
+                        {
+                            fvec3 pos = {
+                                objData["position"][0].get<float>(),
+                                objData["position"][1].get<float>(),
+                                objData["position"][2].get<float>()
+                            };
+                            transform = glm::translate(transform, pos);
+                            hasTransform = true;
+                        }
+
+                        // Rotation (Euler angles in degrees)
+                        if (objData.contains("rotation"))
+                        {
+                            fvec3 rot = {
+                                objData["rotation"][0].get<float>(),
+                                objData["rotation"][1].get<float>(),
+                                objData["rotation"][2].get<float>()
+                            };
+                            transform = glm::rotate(transform, glm::radians(rot.x), fvec3(1, 0, 0));
+                            transform = glm::rotate(transform, glm::radians(rot.y), fvec3(0, 1, 0));
+                            transform = glm::rotate(transform, glm::radians(rot.z), fvec3(0, 0, 1));
+                            hasTransform = true;
+                        }
+
+                        // Scale
+                        if (objData.contains("scale"))
+                        {
+                            fvec3 s = { 1.0f, 1.0f, 1.0f };
+                            if (objData["scale"].is_array())
+                            {
+                                s = {
+                                    objData["scale"][0].get<float>(),
+                                    objData["scale"][1].get<float>(),
+                                    objData["scale"][2].get<float>()
+                                };
+                            }
+                            else if (objData["scale"].is_number())
+                            {
+                                float val = objData["scale"].get<float>();
+                                s = { val, val, val };
+                            }
+                            transform = glm::scale(transform, s);
+                            hasTransform = true;
+                        }
+
+                        if (hasTransform)
+                        {
+                            for (auto& tri : loadedTriangles)
+                            {
+                                // Transform vertices
+                                tri.v0 = fvec3(transform * fvec4(tri.v0, 1.0f));
+                                tri.v1 = fvec3(transform * fvec4(tri.v1, 1.0f));
+                                tri.v2 = fvec3(transform * fvec4(tri.v2, 1.0f));
+                                
+                                // Recalculate normal
+                                fvec3 edge1 = tri.v1 - tri.v0;
+                                fvec3 edge2 = tri.v2 - tri.v0;
+                                tri.normal = glm::normalize(glm::cross(edge1, edge2));
+                                
+                                // Recalculate tangent
+                                tri.CalculateTangent();
+                            }
+                        }
+
+                        triangles.insert(triangles.end(), loadedTriangles.begin(), loadedTriangles.end());
+                    }
+
                     if (objData.contains("triangles"))
                     {
                         for (const auto& triData : objData["triangles"])
@@ -430,6 +510,12 @@ public:
                         }
                     }
                     
+                    // Assign material to all triangles
+                    for(auto& tri : triangles)
+                    {
+                        tri.SetMaterial(mat);
+                    }
+
                     scene->AddGeometry(new Mesh(triangles, mat));
                 }
                 else if (type == "cube")

@@ -111,7 +111,7 @@ bool Triangle::IntersectsAny(const Ray& ray) const
 	return false;
 }
 
-void Triangle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, fvec3& outNormal) const
+void Triangle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, float& outAlpha, fvec3& outNormal) const
 {
     // Compute Barycentrics
     fvec3 v0v1 = v1 - v0;
@@ -159,6 +159,12 @@ void Triangle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, flo
         outMetallic = SampleTexture(material->metallicMap, texCoord).r;
     else
         outMetallic = material->metallicVal;
+
+    // Alpha
+    if (material->alphaMap)
+        outAlpha = SampleTexture(material->alphaMap, texCoord).r;
+    else
+        outAlpha = 0.0f; // Default to opaque if no map
 
     // Normal
     if (material->normalMap)
