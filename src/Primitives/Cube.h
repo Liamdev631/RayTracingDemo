@@ -14,8 +14,9 @@ public:
      * @param size Edge length in world units.
      * @param transform World transform applied to cube vertices.
      * @param material Shared material for all faces.
+     * @param uvScale Scale factor applied to UV coordinates (default: 1.0).
      */
-    Cube(fvec3 center, float size, glm::mat4 transform, std::shared_ptr<PBRMaterial> material);
+    Cube(fvec3 center, float size, glm::mat4 transform, std::shared_ptr<PBRMaterial> material, fvec2 uvScale = fvec2(1.0f));
     
 private:
     /**
@@ -23,7 +24,8 @@ private:
      * @param center Cube center in world space before transform.
      * @param size Edge length in world units.
      * @param transform World transform applied to cube vertices.
+     * @param uvScale Scale factor applied to UV coordinates.
      * @return Triangle list for the cube mesh.
      */
-    static std::vector<Triangle> GenerateTriangles(fvec3 center, float size, glm::mat4 transform);
+    static std::vector<Triangle> GenerateTriangles(fvec3 center, float size, glm::mat4 transform, fvec2 uvScale);
 };

@@ -7,7 +7,7 @@
         },
         "animation": {
             "camera_speed": 0.2,
-            "sun_speed": 0.0
+            "sun_speed": 0.1
         },
         "sky_light": {
             "direction": [-1.0, -1.0, -1.0],
@@ -37,53 +37,41 @@
             "metallic": 0.4
         },
         {
-            "type": "triangle",
-            "v0": [-100.0, 0.0, 100.0],
-            "v1": [100.0, 0.0, 100.0],
-            "v2": [0.0, 200.0, 0.0],
-            "color": [1.0, 0.0, 0.0],
-            "roughness": 0.5,
-            "metallic": 0.0
-        },
-        {
-            "type": "triangle",
-            "v0": [100.0, 0.0, 100.0],
-            "v1": [100.0, 0.0, -100.0],
-            "v2": [0.0, 200.0, 0.0],
-            "color": [0.0, 0.0, 1.0],
-            "roughness": 0.1,
-            "metallic": 0.8
-        },
-        {
-            "type": "mesh",
-            "texture": "textures/awesomeface.png",
-            "triangles": [
-                {
-                    "v0": [-100, 0, -200],
-                    "v1": [100, 0, -200],
-                    "v2": [100, 200, -200],
-                    "uvs": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]],
-                    "color": [1.0, 1.0, 1.0]
-                },
-                {
-                    "v0": [-100, 0, -200],
-                    "v1": [100, 200, -200],
-                    "v2": [-100, 200, -200],
-                    "uvs": [[0.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
-                    "color": [1.0, 1.0, 1.0]
-                }
-            ]
-        },
-        {
             "type": "cube",
             "center": [250, 75.0, -32.0],
             "size": 150.0,
             "transform": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            "uv_scale": 1.0,
             "material": {
-                "albedo": "textures/TilesSquarePoolMixed001/TilesSquarePoolMixed001_COL_1K.jpg",
-                "normal": "textures/TilesSquarePoolMixed001/TilesSquarePoolMixed001_NRM_1K.jpg",
-                "gloss": "textures/TilesSquarePoolMixed001/TilesSquarePoolMixed001_GLOSS_1K.jpg",
-                "metallic": 0.0
+                "albedo": "assets/Materials/PoolTile/Albedo.jpg",
+                "normal": "assets/Materials/PoolTile/Normal.jpg",
+                "roughness": "assets/Materials/PoolTile/Roughness.jpg",
+                "metallic": 0.2
+            }
+        },
+        {
+            "type": "cube",
+            "center": [0, 50.0, 20.0],
+            "size": 100.0,
+            "transform": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            "uv_scale": 1.0,
+            "material": {
+                "albedo": [1.0, 1.0, 1.0],
+                "roughness": 0.0,
+                "metallic": 1.0
+            }
+        },
+        {
+            "type": "cube",
+            "center": [-250, 75.0, -32.0],
+            "size": 150.0,
+            "transform": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            "uv_scale": 1.0,
+            "material": {
+                "albedo": "assets/Materials/Ceramic/Albedo.jpg",
+                "normal": "assets/Materials/Ceramic/Normal.png",
+                "roughness": "assets/Materials/Ceramic/Roughness.jpg",
+                "metallic": "assets/Materials/Ceramic/Metallic.jpg"
             }
         }
     ]

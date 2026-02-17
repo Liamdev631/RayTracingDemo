@@ -16,4 +16,16 @@ namespace Constants
 
     /** @brief Small epsilon used for numerical comparisons and stability. */
     constexpr float EPSILON = 1e-4f;
+
+    /** @brief Enum for selecting the sampling method. */
+    enum class SamplingType {
+        Uniform,
+        Stratified
+    };
+
+    /** @brief Number of samples per pixel in each dimension for stratified sampling. */
+    constexpr int STRATIFIED_SAMPLES = 2;
+
+    /** @brief Current sampling method configuration. */
+    constexpr SamplingType SAMPLING_METHOD = SamplingType::Uniform;
 }

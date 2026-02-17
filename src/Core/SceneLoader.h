@@ -23,6 +23,13 @@ using namespace std;
 class SceneLoader
 {
 private:
+    /**
+     * @brief Loads a texture from the scene, caching it if not already loaded.
+     * @param scene The scene to load the texture into.
+     * @param cache A cache mapping texture paths to texture indices.
+     * @param path The path to the texture file.
+     * @return A pointer to the loaded texture, or nullptr if loading failed.
+     */
     static const sf::Image* GetOrLoadTexture(Scene* scene, std::map<string, int>& cache, const string& path)
     {
         if (cache.find(path) != cache.end())
@@ -463,8 +470,23 @@ public:
                         }
                     }
                     
+                    fvec2 uvScale = { 1.0f, 1.0f };
+                    if (objData.contains("uv_scale"))
+                    {
+                        if (objData["uv_scale"].is_array())
+                        {
+                            uvScale.x = objData["uv_scale"][0];
+                            uvScale.y = objData["uv_scale"][1];
+                        }
+                        else if (objData["uv_scale"].is_number())
+                        {
+                            float s = objData["uv_scale"];
+                            uvScale = { s, s };
+                        }
+                    }
+
                     auto mat = ParseMaterial(objData, scene.get(), textureCache);
-                    scene->AddGeometry(new Cube(center, size, transform, mat));
+                    scene->AddGeometry(new Cube(center, size, transform, mat, uvScale));
                 }
             }
         }

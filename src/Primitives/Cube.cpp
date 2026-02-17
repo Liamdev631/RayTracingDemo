@@ -1,12 +1,12 @@
 #include "Cube.h"
 #include "../Scene/Geometry/Triangle.h"
 
-Cube::Cube(fvec3 center, float size, glm::mat4 transform, std::shared_ptr<PBRMaterial> material)
-    : Mesh(GenerateTriangles(center, size, transform), material)
+Cube::Cube(fvec3 center, float size, glm::mat4 transform, std::shared_ptr<PBRMaterial> material, fvec2 uvScale)
+    : Mesh(GenerateTriangles(center, size, transform, uvScale), material)
 {
 }
 
-std::vector<Triangle> Cube::GenerateTriangles(fvec3 center, float size, glm::mat4 transform)
+std::vector<Triangle> Cube::GenerateTriangles(fvec3 center, float size, glm::mat4 transform, fvec2 uvScale)
 {
     std::vector<Triangle> tris;
     tris.reserve(12);
@@ -27,14 +27,6 @@ std::vector<Triangle> Cube::GenerateTriangles(fvec3 center, float size, glm::mat
     fvec3 v7 = fvec3(-h,  h, -h);
     
     // Apply transform and center offset
-    // Wait, center is usually the position. If transform is Identity, cube is at center.
-    // So vertices should be (local + center).
-    // Or transform is applied to (local + center)?
-    // User said: "constructs a cube from a center position, a size ... and a world space transform matrix."
-    // If transform is meant to position the cube, center might be (0,0,0) or relative offset.
-    // Let's assume center is the origin of the cube, and transform is applied ON TOP of that.
-    // So P_world = Transform * (P_local + Center).
-    
     auto transformPt = [&](fvec3 p) {
         return fvec3(transform * glm::vec4(p + center, 1.0f));
     };
@@ -53,11 +45,11 @@ std::vector<Triangle> Cube::GenerateTriangles(fvec3 center, float size, glm::mat
     auto addQuad = [&](fvec3 a, fvec3 b, fvec3 c, fvec3 d) {
         // Tri 1: a, b, c
         Triangle tri1(a, b, c, fvec3(1.0f));
-        tri1.SetUVs(fvec2(0, 0), fvec2(1, 0), fvec2(1, 1));
+        tri1.SetUVs(fvec2(0, 0) * uvScale, fvec2(1, 0) * uvScale, fvec2(1, 1) * uvScale);
         
         // Tri 2: a, c, d
         Triangle tri2(a, c, d, fvec3(1.0f));
-        tri2.SetUVs(fvec2(0, 0), fvec2(1, 1), fvec2(0, 1));
+        tri2.SetUVs(fvec2(0, 0) * uvScale, fvec2(1, 1) * uvScale, fvec2(0, 1) * uvScale);
         
         tris.push_back(tri1);
         tris.push_back(tri2);

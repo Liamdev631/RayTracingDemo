@@ -1,13 +1,9 @@
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include "SceneRenderer.h"
-#include "../Primitives/Group.h"
-#include "../Primitives/Sphere.h"
-#include "../Primitives/CheckerCircle.h"
 #include <thread>
 #include <chrono>
 #define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtc/random.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <random>
 #include "SceneLoader.h"
@@ -22,70 +18,18 @@
 using namespace std;
 using namespace chrono_literals;
 
-const float RenderScale = std::sqrt(2.0f);
 int TargetWidth = 960;
 int TargetHeight = 540;
-int RenderWidth = static_cast<int>(TargetWidth * RenderScale);
-int RenderHeight = static_cast<int>(TargetHeight * RenderScale);
 
 // Global variables to replace Program class state
 sf::RenderWindow _window;
-std::unique_ptr<SceneRenderer> _renderer; // Higher resolution for supersampling
+std::unique_ptr<SceneRenderer> _renderer;
 std::shared_ptr<Scene> _scene;
 sf::RectangleShape _imageBox;
-unique_ptr<sf::Texture> _renderTargetHighRes;
 unique_ptr<sf::Texture> _renderTargetFinal;
 float _totalTime = 0.0f;
 
-void Downscale(const sf::Image& src, sf::Image& dst)
-{
-    // Simple bilinear downscale
-    const uint8_t* srcPixels = src.getPixelsPtr();
-    std::vector<uint8_t> dstPixels(TargetWidth * TargetHeight * 4);
-    
-    float xRatio = (float)(RenderWidth - 1) / TargetWidth;
-    float yRatio = (float)(RenderHeight - 1) / TargetHeight;
-    
-    for (int y = 0; y < TargetHeight; y++)
-    {
-        for (int x = 0; x < TargetWidth; x++)
-        {
-            int x_l = (int)(xRatio * x);
-            int y_l = (int)(yRatio * y);
-            int x_h = (int)(xRatio * x) + 1;
-            int y_h = (int)(yRatio * y) + 1;
-            
-            float x_weight = (xRatio * x) - x_l;
-            float y_weight = (yRatio * y) - y_l;
-            
-            auto getPixel = [&](int px, int py) {
-                if (px >= RenderWidth) px = RenderWidth - 1;
-                if (py >= RenderHeight) py = RenderHeight - 1;
-                int idx = (px + py * RenderWidth) * 4;
-                return glm::vec4(srcPixels[idx], srcPixels[idx+1], srcPixels[idx+2], srcPixels[idx+3]);
-            };
-            
-            glm::vec4 a = getPixel(x_l, y_l);
-            glm::vec4 b = getPixel(x_h, y_l);
-            glm::vec4 c = getPixel(x_l, y_h);
-            glm::vec4 d = getPixel(x_h, y_h);
-            
-            glm::vec4 pixel = glm::mix(
-                glm::mix(a, b, x_weight),
-                glm::mix(c, d, x_weight),
-                y_weight
-            );
-            
-            int dstIdx = (x + y * TargetWidth) * 4;
-            dstPixels[dstIdx] = (uint8_t)pixel.r;
-            dstPixels[dstIdx+1] = (uint8_t)pixel.g;
-            dstPixels[dstIdx+2] = (uint8_t)pixel.b;
-            dstPixels[dstIdx+3] = (uint8_t)pixel.a;
-        }
-    }
-    
-    dst.create(TargetWidth, TargetHeight, dstPixels.data());
-}
+
 
 void SaveFrame()
 {
@@ -177,13 +121,7 @@ void Render()
 {
     _window.clear(sf::Color::Magenta);
     UpdateScene(_totalTime);
-    if (_renderer) _renderer->Render(_renderTargetHighRes);
-    
-    // Downscale
-    sf::Image highRes = _renderTargetHighRes->copyToImage();
-    sf::Image finalImg;
-    Downscale(highRes, finalImg);
-    _renderTargetFinal->loadFromImage(finalImg);
+    if (_renderer) _renderer->Render(_renderTargetFinal);
 
     _imageBox.setTexture(_renderTargetFinal.get());
     _window.draw(_imageBox);
@@ -193,54 +131,20 @@ void SetupScene(const std::string& sceneFile)
 {
     srand(static_cast<unsigned int>(time(0)));
 
-    printf("Loading scene from %s\n", sceneFile.c_str());
     if (sceneFile.empty())
     {
-        printf("Building procedural scene.\n");
-        _scene = make_shared<Scene>();
-        _scene->AmbientLightColor = { 1, 1, 1 };
-        _scene->AmbientIntensity = 0.1f;
-        _scene->SunLight = DirectionalLight(glm::normalize(fvec3(-1, -1, -1)), {1, 1, 1}, 1.0f);
-        
-        const int num_point_lights = 4;
-        for (int i = 0; i < num_point_lights; i++)
-        {
-            fvec3 pos = {
-                glm::linearRand<float>(-3600, 3600),
-                glm::linearRand<float>(-3600, 3600),
-                glm::linearRand<float>(-3600, 3600)
-            };
-            fvec3 color = {
-                glm::linearRand<float>(0, 1),
-                glm::linearRand<float>(0, 1),
-                glm::linearRand<float>(0, 1)
-            };
-            float intensity = glm::linearRand<float>(0.5f, 1.0f);
-            _scene->AddLight(new PointLight(pos, color, intensity));
-        }
+        printf("Error: No scene file provided.\n");
+        exit(1);
+    }
 
-        const int num_spheres = 32;
-        for (int i = 0; i < num_spheres; i++)
-        {
-            fvec3 pos = {
-                glm::linearRand<float>(-1200, 1200),
-                glm::linearRand<float>(-1200, 1200),
-                glm::linearRand<float>(-1200, 1200) };
-            float rad = glm::linearRand<float>(80, 240);
-            _scene->AddGeometry(new Sphere(pos, rad));
-        }
-        
-        _scene->AddGeometry(new CheckerCircle({0,0,0}, {0,1,0}));
-    }
-    else
+    printf("Loading scene from %s\n", sceneFile.c_str());
+    _scene = SceneLoader::LoadScene(sceneFile);
+    if (!_scene)
     {
-        _scene = SceneLoader::LoadScene(sceneFile);
-        if (!_scene)
-        {
-            printf("Failed to load scene, exiting.\n");
-            exit(1);
-        }
+        printf("Failed to load scene from %s, exiting.\n", sceneFile.c_str());
+        exit(1);
     }
+
     if (_renderer) _renderer->SetScene(_scene);
 }
 
@@ -259,15 +163,12 @@ void SetupWindow()
     _imageBox.setPosition({ 0, 0 });
     _imageBox.setFillColor(sf::Color::White);
 
-    _renderTargetHighRes = make_unique<sf::Texture>();
-    _renderTargetHighRes->create(RenderWidth, RenderHeight);
-
     _renderTargetFinal = make_unique<sf::Texture>();
     _renderTargetFinal->create(TargetWidth, TargetHeight);
     
     _imageBox.setTexture(_renderTargetFinal.get());
 
-    _renderer = std::make_unique<SceneRenderer>(sf::Vector2u((unsigned int)RenderWidth, (unsigned int)RenderHeight));
+    _renderer = std::make_unique<SceneRenderer>(sf::Vector2u((unsigned int)TargetWidth, (unsigned int)TargetHeight));
 }
 
 int main(int argc, char **argv)
@@ -287,10 +188,6 @@ int main(int argc, char **argv)
     app.add_option("--height", TargetHeight, "Output video height")->default_val(540);
 
     CLI11_PARSE(app, argc, argv);
-
-    // Update Render dimensions based on parsed Target dimensions
-    RenderWidth = static_cast<int>(TargetWidth * RenderScale);
-    RenderHeight = static_cast<int>(TargetHeight * RenderScale);
 
     try {
         SetupWindow();
