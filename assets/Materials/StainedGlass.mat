@@ -1,0 +1,6 @@
+{
+    "albedo": "StainedGlass/Albedo.jpg",
+    "alpha": "StainedGlass/Metallic.jpg",
+    "roughness": 0.1,
+    "metallic": 0.1
+}

@@ -10,6 +10,7 @@
 #include "../Scene/Geometry/Triangle.h"
 #include "../Primitives/Mesh.h"
 #include "../Primitives/Cube.h"
+#include "../Primitives/Plane.h"
 #include "Material.h"
 #include "MeshLoader.h"
 #include <fstream>
@@ -147,6 +148,15 @@ private:
             {
                  mat->glossMap = GetOrLoadTexture(scene, cache, m["gloss"]);
             }
+
+            // Alpha
+            if (m.contains("alpha"))
+            {
+                if (m["alpha"].is_string())
+                    mat->alphaMap = GetOrLoadTexture(scene, cache, m["alpha"]);
+                else if (m["alpha"].is_number())
+                    mat->alphaVal = m["alpha"];
+            }
         }
         
         return mat;
@@ -206,11 +216,33 @@ public:
             if (settings.contains("sky_light"))
             {
                 auto& sky = settings["sky_light"];
-                fvec3 dir = {
-                    sky["direction"][0].get<float>(),
-                    sky["direction"][1].get<float>(),
-                    sky["direction"][2].get<float>()
-                };
+                
+                float orbit = 0.0f;
+                float altitude = 45.0f;
+                if (sky.contains("orbit_angle")) {
+                    if (sky["orbit_angle"].is_array()) {
+                        scene->SunOrbitStart = sky["orbit_angle"][0];
+                        scene->SunOrbitEnd = sky["orbit_angle"][1];
+                        orbit = scene->SunOrbitStart;
+                    } else {
+                        orbit = sky["orbit_angle"];
+                        scene->SunOrbitStart = orbit;
+                        scene->SunOrbitEnd = orbit;
+                    }
+                }
+                
+                if (sky.contains("altitude")) {
+                    if (sky["altitude"].is_array()) {
+                        scene->SunAltitudeStart = sky["altitude"][0];
+                        scene->SunAltitudeEnd = sky["altitude"][1];
+                        altitude = scene->SunAltitudeStart;
+                    } else {
+                        altitude = sky["altitude"];
+                        scene->SunAltitudeStart = altitude;
+                        scene->SunAltitudeEnd = altitude;
+                    }
+                }
+
                 fvec3 color = {
                     sky["color"][0].get<float>(),
                     sky["color"][1].get<float>(),
@@ -218,8 +250,20 @@ public:
                 };
                 float intensity = sky["intensity"].get<float>();
                 
+                // Calculate initial direction
+                // Y is Up. Orbit is around Y axis. Altitude is angle from XZ plane.
+                float orbitRad = glm::radians(orbit);
+                float altRad = glm::radians(altitude);
+                
+                fvec3 sunPos(
+                    std::cos(altRad) * std::sin(orbitRad),
+                    std::sin(altRad),
+                    std::cos(altRad) * std::cos(orbitRad)
+                );
+                
+                fvec3 dir = -glm::normalize(sunPos);
+                
                 scene->SunLight = DirectionalLight(dir, color, intensity);
-                scene->InitialSunDirection = glm::normalize(dir);
                 scene->InitialSunIntensity = intensity;
                 hasDirectionalLight = true;
             }
@@ -280,7 +324,9 @@ public:
                         lightData["color"][2].get<float>()
                     };
                     float intensity = lightData["intensity"].get<float>();
-                    scene->AddLight(new PointLight(pos, color, intensity));
+                    auto light = new PointLight(pos, color, intensity);
+                    if (lightData.contains("name")) light->Name = lightData["name"];
+                    scene->AddLight(light);
                 }
             }
         }
@@ -327,9 +373,11 @@ public:
                     auto sphere = new Sphere(pos, radius);
                     if (objData.contains("roughness")) sphere->roughness = objData["roughness"].get<float>();
                     if (objData.contains("metallic")) sphere->metallic = objData["metallic"].get<float>();
+                    if (objData.contains("alpha")) sphere->alpha = objData["alpha"].get<float>();
+                    if (objData.contains("name")) sphere->Name = objData["name"];
                     scene->AddGeometry(sphere);
                 }
-                else if (type == "plane" || type == "checker_circle")
+                else if (type == "checker_circle")
                 {
                     fvec3 origin = {
                         objData["origin"][0].get<float>(),
@@ -348,7 +396,60 @@ public:
                     auto cc = new CheckerCircle(origin, normal, radius);
                     if (objData.contains("roughness")) cc->roughness = objData["roughness"].get<float>();
                     if (objData.contains("metallic")) cc->metallic = objData["metallic"].get<float>();
+                    if (objData.contains("alpha")) cc->alpha = objData["alpha"].get<float>();
+                    if (objData.contains("name")) cc->Name = objData["name"];
                     scene->AddGeometry(cc);
+                }
+                else if (type == "plane")
+                {
+                    fvec3 center = { 0, 0, 0 };
+                    if (objData.contains("center"))
+                        center = { objData["center"][0], objData["center"][1], objData["center"][2] };
+                    else if (objData.contains("origin"))
+                        center = { objData["origin"][0], objData["origin"][1], objData["origin"][2] };
+                        
+                    fvec2 size = { 100.0f, 100.0f };
+                    if (objData.contains("size"))
+                    {
+                        if (objData["size"].is_array())
+                            size = { objData["size"][0], objData["size"][1] };
+                        else if (objData["size"].is_number())
+                        {
+                            float s = objData["size"];
+                            size = { s, s };
+                        }
+                    }
+                    
+                    glm::mat4 transform(1.0f);
+                    if (objData.contains("transform"))
+                    {
+                        auto& t = objData["transform"];
+                        if (t.size() == 16)
+                        {
+                             for (int i = 0; i < 16; i++)
+                                transform[i / 4][i % 4] = t[i];
+                        }
+                    }
+                    
+                    fvec2 uvScale = { 1.0f, 1.0f };
+                    if (objData.contains("uv_scale"))
+                    {
+                        if (objData["uv_scale"].is_array())
+                        {
+                            uvScale.x = objData["uv_scale"][0];
+                            uvScale.y = objData["uv_scale"][1];
+                        }
+                        else if (objData["uv_scale"].is_number())
+                        {
+                            float s = objData["uv_scale"];
+                            uvScale = { s, s };
+                        }
+                    }
+
+                    auto mat = ParseMaterial(objData, scene.get(), textureCache);
+                    auto plane = new Plane(center, size, transform, mat, uvScale);
+                    if (objData.contains("name")) plane->Name = objData["name"];
+                    scene->AddGeometry(plane);
                 }
                 else if (type == "triangle")
                 {
@@ -381,6 +482,7 @@ public:
                         tri->SetUVs(uv0, uv1, uv2);
                     }
                     
+                    if (objData.contains("name")) tri->Name = objData["name"];
                     scene->AddGeometry(tri);
                 }
                 else if (type == "mesh")
@@ -391,7 +493,7 @@ public:
                     if (objData.contains("file"))
                     {
                         string filePath = objData["file"];
-                        auto loadedTriangles = MeshLoader::LoadMesh(filePath);
+                        auto loadedParts = MeshLoader::LoadMesh(filePath);
                         
                         // Apply transforms if present
                         glm::mat4 transform(1.0f);
@@ -446,24 +548,30 @@ public:
 
                         if (hasTransform)
                         {
-                            for (auto& tri : loadedTriangles)
+                            for (auto& part : loadedParts)
                             {
-                                // Transform vertices
-                                tri.v0 = fvec3(transform * fvec4(tri.v0, 1.0f));
-                                tri.v1 = fvec3(transform * fvec4(tri.v1, 1.0f));
-                                tri.v2 = fvec3(transform * fvec4(tri.v2, 1.0f));
-                                
-                                // Recalculate normal
-                                fvec3 edge1 = tri.v1 - tri.v0;
-                                fvec3 edge2 = tri.v2 - tri.v0;
-                                tri.normal = glm::normalize(glm::cross(edge1, edge2));
-                                
-                                // Recalculate tangent
-                                tri.CalculateTangent();
+                                for (auto& tri : part.triangles)
+                                {
+                                    // Transform vertices
+                                    tri.v0 = fvec3(transform * fvec4(tri.v0, 1.0f));
+                                    tri.v1 = fvec3(transform * fvec4(tri.v1, 1.0f));
+                                    tri.v2 = fvec3(transform * fvec4(tri.v2, 1.0f));
+                                    
+                                    // Recalculate normal
+                                    fvec3 edge1 = tri.v1 - tri.v0;
+                                    fvec3 edge2 = tri.v2 - tri.v0;
+                                    tri.normal = glm::normalize(glm::cross(edge1, edge2));
+                                    
+                                    // Recalculate tangent
+                                    tri.CalculateTangent();
+                                }
                             }
                         }
 
-                        triangles.insert(triangles.end(), loadedTriangles.begin(), loadedTriangles.end());
+                        for (const auto& part : loadedParts)
+                        {
+                            triangles.insert(triangles.end(), part.triangles.begin(), part.triangles.end());
+                        }
                     }
 
                     if (objData.contains("triangles"))
@@ -516,7 +624,9 @@ public:
                         tri.SetMaterial(mat);
                     }
 
-                    scene->AddGeometry(new Mesh(triangles, mat));
+                    auto mesh = new Mesh(triangles, mat);
+                    if (objData.contains("name")) mesh->Name = objData["name"];
+                    scene->AddGeometry(mesh);
                 }
                 else if (type == "cube")
                 {
@@ -572,8 +682,51 @@ public:
                     }
 
                     auto mat = ParseMaterial(objData, scene.get(), textureCache);
-                    scene->AddGeometry(new Cube(center, size, transform, mat, uvScale));
+                    auto cube = new Cube(center, size, transform, mat, uvScale);
+                    if (objData.contains("name")) cube->Name = objData["name"];
+                    scene->AddGeometry(cube);
                 }
+            }
+        }
+
+        // Load Animators
+        if (j.contains("animators"))
+        {
+            for (const auto& animData : j["animators"])
+            {
+                Animator anim;
+                anim.TargetName = animData["target"];
+                anim.Property = animData["property"];
+                if (animData.contains("normalized")) anim.NormalizedTime = animData["normalized"];
+                
+                if (animData.contains("keyframes"))
+                {
+                    for (const auto& kfData : animData["keyframes"])
+                    {
+                        Keyframe kf;
+                        kf.Time = kfData["time"];
+                        if (kfData["value"].is_array())
+                        {
+                            kf.Value = {
+                                kfData["value"][0].get<float>(),
+                                kfData["value"][1].get<float>(),
+                                kfData["value"][2].get<float>()
+                            };
+                        }
+                        else if (kfData["value"].is_number())
+                        {
+                            float v = kfData["value"];
+                            kf.Value = { v, 0, 0 }; // Scalar stored in x
+                        }
+                        anim.Keyframes.push_back(kf);
+                    }
+                    // Sort keyframes
+                    std::sort(anim.Keyframes.begin(), anim.Keyframes.end(), [](const Keyframe& a, const Keyframe& b){
+                        return a.Time < b.Time;
+                    });
+                }
+                
+                scene->Animators.push_back(anim);
             }
         }
 

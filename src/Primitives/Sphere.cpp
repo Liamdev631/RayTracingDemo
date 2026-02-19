@@ -43,6 +43,6 @@ void Sphere::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float
 	outAlbedo = { 0.8f, 0.8f, 0.8f };
 	outRoughness = roughness;
 	outMetallic = metallic;
-	outAlpha = 0.0f; // Opaque
+	outAlpha = alpha; // Opaque by default
 	outNormal = glm::normalize(p - center);
 }

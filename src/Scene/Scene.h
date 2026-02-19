@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include "Ray.h"
 #include "Light.h"
+#include "Animation/Animator.h"
 
 using namespace std;
 using namespace glm;
@@ -20,6 +21,7 @@ class Geometry;
  */
 class Scene
 {
+    friend class Animator;
 public:
     /** @brief Camera rotation speed in radians per second. */
     float CameraRotationSpeed = 0.0f;
@@ -37,8 +39,12 @@ public:
 
     /** @brief Directional light representing the sun. */
     DirectionalLight SunLight;
-    /** @brief Initial sun direction used for animation. */
-    fvec3 InitialSunDirection = { 0, -1, 0 };
+    /** @brief Initial sun orbit angle in degrees. */
+    float SunOrbitStart = 0.0f;
+    float SunOrbitEnd = 0.0f;
+    /** @brief Sun altitude angle in degrees. */
+    float SunAltitudeStart = 45.0f;
+    float SunAltitudeEnd = 45.0f;
     /** @brief Initial sun intensity used for animation. */
     float InitialSunIntensity = 1.0f;
 
@@ -46,6 +52,19 @@ public:
     fvec3 AmbientLightColor = { 1, 1, 1 };
     /** @brief Ambient light intensity scalar. */
     float AmbientIntensity = 0.1f;
+
+    /** @brief Animators attached to the scene. */
+    std::vector<Animator> Animators;
+
+    /** @brief Camera rotation in degrees (pitch, yaw, roll). */
+    fvec3 CameraRotation = { 0, 0, 0 };
+
+    /**
+     * @brief Updates scene animations.
+     * @param time Current time in seconds.
+     * @param duration Total duration in seconds.
+     */
+    void Update(float time, float duration);
 
 private:
     vector<Geometry*> _geometry;

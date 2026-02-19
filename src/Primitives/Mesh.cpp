@@ -90,7 +90,7 @@ bool Mesh::IntersectsAny(const Ray& ray) const
     return false;
 }
 
-void Mesh::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, fvec3& outNormal) const
+void Mesh::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, float& outAlpha, fvec3& outNormal) const
 {
     // Should not be called directly if HitGeometry is set correctly to triangles
     // But if it is, we return a fallback.
@@ -100,5 +100,6 @@ void Mesh::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& 
     outAlbedo = { 1.0f, 0.0f, 1.0f }; // Error pink
     outRoughness = 0.5f;
     outMetallic = 0.0f;
-    outNormal = fvec3(0, 1, 0);
+    outAlpha = 1.0f;
+    outNormal = glm::vec3(0, 1, 0);
 }

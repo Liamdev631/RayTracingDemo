@@ -2,6 +2,7 @@
 #include "../Ray.h"
 #include "../Scene.h"
 #include <SFML/Graphics.hpp>
+#include <string>
 
 /**
  * @brief Base interface for all renderable geometry.
@@ -12,6 +13,9 @@
 class Geometry
 {
 public:
+    /** @brief Name of the object for identification and animation. */
+    std::string Name;
+
 	/**
 	 * @brief Tests ray intersection and outputs hit data.
 	 * @param scene Scene context for dependent geometry.

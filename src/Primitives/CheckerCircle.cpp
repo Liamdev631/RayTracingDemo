@@ -65,6 +65,6 @@ void CheckerCircle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness
 	// White tiles (check) get the base roughness (reflective), Dark tiles get 1.0 (matte)
 	outRoughness = check ? roughness : 0.9f; 
 	outMetallic = metallic;
-	outAlpha = 0.0f; // Opaque
+	outAlpha = alpha; // Opaque by default
 	outNormal = normal;
 }

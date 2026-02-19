@@ -1,0 +1,73 @@
+{
+    "settings": {
+        "camera": {
+            "position": [0.0, 150.0, 300.0],
+            "target": [0.0, 75.0, 0.0],
+            "fov": 60.0
+        },
+        "sky_light": {
+            "orbit_angle": [0.0, 90.0],
+            "altitude": [60.0, 20.0],
+            "color": [1.0, 0.9, 0.7],
+            "intensity": 1.5
+        },
+        "ambient": {
+            "color": [1.0, 1.0, 1.0],
+            "intensity": 0.1
+        }
+    },
+    "lights": [
+        {
+            "type": "point",
+            "position": [0.0, 300.0, 200.0],
+            "color": [1.0, 1.0, 1.0],
+            "intensity": 1.0
+        }
+    ],
+    "objects": [
+        {
+            "name": "Floor",
+            "type": "checker_circle",
+            "origin": [0.0, 0.0, 0.0],
+            "normal": [0.0, 1.0, 0.0],
+            "radius": 250.0,
+            "roughness": 0.2,
+            "metallic": 0.4
+        },
+        {
+            "name": "Stained Glass Window",
+            "type": "plane",
+            "center": [0.0, 75.0, 0.0],
+            "size": [150.0, 150.0],
+            "uv_scale": 1.0,
+            "material": {
+                "albedo": "assets/Materials/StainedGlass/Albedo.jpg",
+                "alpha": "assets/Materials/StainedGlass/Alpha.png",
+                "roughness": 0.1,
+                "metallic": 0.5
+            }
+        },
+        {
+            "name": "Red Cube",
+            "type": "cube",
+            "center": [-150.0, 25.0, 0.0],
+            "size": 50.0,
+            "material": {
+                "albedo": [1.0, 0.0, 0.0],
+                "roughness": 0.5,
+                "metallic": 0.0
+            }
+        },
+        {
+            "name": "Green Cube",
+            "type": "cube",
+            "center": [150.0, 25.0, 0.0],
+            "size": 50.0,
+            "material": {
+                "albedo": [0.0, 1.0, 0.0],
+                "roughness": 0.5,
+                "metallic": 0.0
+            }
+        }
+    ]
+}

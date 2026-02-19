@@ -5,8 +5,11 @@
 static fvec3 SampleTexture(const sf::Image* texture, fvec2 uv)
 {
 	if (!texture) return { 1, 1, 1 };
+	if (std::isnan(uv.x) || std::isnan(uv.y)) return { 1, 0, 1 }; // Debug magenta
+
 	int w = texture->getSize().x;
 	int h = texture->getSize().y;
+	if (w == 0 || h == 0) return { 1, 1, 1 };
 
 	// Repeat wrap
 	uv.x = uv.x - std::floor(uv.x);
@@ -164,7 +167,7 @@ void Triangle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, flo
     if (material->alphaMap)
         outAlpha = SampleTexture(material->alphaMap, texCoord).r;
     else
-        outAlpha = 0.0f; // Default to opaque if no map
+        outAlpha = material->alphaVal; // Default to scalar value (usually 1.0)
 
     // Normal
     if (material->normalMap)

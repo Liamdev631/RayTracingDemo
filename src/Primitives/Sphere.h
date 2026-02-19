@@ -15,6 +15,8 @@ public:
 	float roughness = 0.5f;
 	/** @brief Default metallic value for PBR shading. */
 	float metallic = 0.0f;
+	/** @brief Default alpha value for PBR shading. */
+	float alpha = 1.0f;
 
 public:
 	/**

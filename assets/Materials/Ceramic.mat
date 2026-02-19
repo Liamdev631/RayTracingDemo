@@ -1,0 +1,7 @@
+{
+    "albedo": "Ceramic/Albedo.jpg",
+    "metallic": "Ceramic/Metallic.jpg",
+    "normal": "Ceramic/Normal.jpg",
+    "roughness": "Ceramic/Roughness.jpg",
+    "alpha": 1.0
+}

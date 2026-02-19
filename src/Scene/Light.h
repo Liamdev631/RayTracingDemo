@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <string>
 
 using namespace glm;
 
@@ -8,6 +9,8 @@ using namespace glm;
  */
 struct PointLight
 {
+    /** @brief Name of the light for identification and animation. */
+    std::string Name;
     /** @brief World-space light position. */
     fvec3 Position;
     /** @brief RGB light color. */

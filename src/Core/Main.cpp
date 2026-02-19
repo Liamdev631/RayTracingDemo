@@ -26,8 +26,10 @@ std::unique_ptr<sf::RenderWindow> _window;
 std::unique_ptr<SceneRenderer> _renderer;
 std::shared_ptr<Scene> _scene;
 std::unique_ptr<sf::RectangleShape> _imageBox;
-unique_ptr<sf::Texture> _renderTargetFinal;
+std::unique_ptr<sf::Texture> _renderTargetFinal;
 float _totalTime = 0.0f;
+float _targetRuntime = 10.0f;
+std::vector<double> _frameTimes;
 
 void SaveFrame()
 {
@@ -70,18 +72,30 @@ void ProcessEvent(const sf::Event& ev) noexcept
     }
 }
 
-void UpdateScene(float time)
+void UpdateScene(float time, float duration)
 {
     if (!_scene) return;
 
-    // Rotate Sun
+    // Update Animators
+    _scene->Update(time, duration);
+
+    // Rotate Sun (Legacy / Procedural fallback)
     if (_scene->SunRotationSpeed != 0.0f)
     {
-        float angle = time * _scene->SunRotationSpeed;
-        // Rotate initial direction around X axis to simulate day/night cycle
-        fvec3 dir = _scene->InitialSunDirection;
-        dir = glm::rotateX(dir, angle);
-        _scene->SunLight.Direction = glm::normalize(dir);
+        // Orbit around Y axis (on XZ plane)
+        // SunRotationSpeed is in radians/second
+        float currentOrbitRad = glm::radians(_scene->SunOrbitStart) + time * _scene->SunRotationSpeed;
+        float altitudeRad = glm::radians(_scene->SunAltitudeStart);
+
+        // Calculate Sun Position (Y is Up)
+        fvec3 sunPos(
+            std::cos(altitudeRad) * std::sin(currentOrbitRad),
+            std::sin(altitudeRad),
+            std::cos(altitudeRad) * std::cos(currentOrbitRad)
+        );
+
+        // Direction is from Sun to Origin
+        _scene->SunLight.Direction = -glm::normalize(sunPos);
 
         // Horizon check: If direction is pointing UP (y > 0), it's below horizon -> intensity 0
         if (_scene->SunLight.Direction.y > 0)
@@ -109,8 +123,13 @@ void Render()
 {
     if (!_window) return;
     _window->clear(sf::Color::Magenta);
-    UpdateScene(_totalTime);
+    UpdateScene(_totalTime, _targetRuntime);    
+    
+    auto start = std::chrono::high_resolution_clock::now();
     if (_renderer) _renderer->Render(_renderTargetFinal);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> ms = end - start;
+    _frameTimes.push_back(ms.count());
 
     if (_imageBox && _renderTargetFinal)
     {
@@ -121,7 +140,6 @@ void Render()
 
 void SetupScene(const std::string& sceneFile)
 {
-    // ... (unchanged logic, just ensuring _scene usage is consistent)
     srand(static_cast<unsigned int>(time(0)));
 
     if (sceneFile.empty())
@@ -174,17 +192,25 @@ int main(int argc, char** argv)
     
     std::string scenePath = "scenes/scene.json";
     int fps = 24;
-    int runtime = 10;
+    float runtime = 10.0f;
     bool singleFrame = false;
+    bool noTransparency = false;
+    bool noReflections = false;
+    int stratifiedSamples = Constants::DEFAULT_STRATIFIED_SAMPLES;
 
     app.add_option("--scene", scenePath, "Path to scene file");
     app.add_option("--width", resolutionX, "Output width");
     app.add_option("--height", resolutionY, "Output height");
     app.add_option("--fps", fps, "Frames per second");
     app.add_option("--runtime", runtime, "Runtime in seconds");
+    app.add_option("--stratified-samples", stratifiedSamples, "Number of stratified samples per dimension (e.g. 2 means 4 samples/pixel)");
     app.add_flag("--single-frame", singleFrame, "Run in interactive single-frame mode");
+    app.add_flag("--no-transparency", noTransparency, "Disable transparency");
+    app.add_flag("--no-reflections", noReflections, "Disable reflections");
     
     CLI11_PARSE(app, argc, argv);
+
+    _targetRuntime = (float)runtime;
 
     std::cout << "Loading scene: " << scenePath << std::endl;
     
@@ -197,6 +223,17 @@ int main(int argc, char** argv)
     // Initialize Window and Renderer resources
     try {
         SetupWindow();
+        
+        if (_renderer)
+        {
+            _renderer->SetTransparency(!noTransparency);
+            _renderer->SetReflections(!noReflections);
+            _renderer->SetStratifiedSamples(stratifiedSamples);
+            if (stratifiedSamples > 1)
+                _renderer->SetSamplingMethod(Constants::SamplingType::Stratified);
+            else
+                _renderer->SetSamplingMethod(Constants::SamplingType::Uniform);
+        }
 
         try {
             _scene = SceneLoader::LoadScene(scenePath);
@@ -217,27 +254,39 @@ int main(int argc, char** argv)
 
     // Logic continues below (reusing existing code structure where possible)
     if (singleFrame)
+    {
+        // Interactive mode
+        printf("Starting interactive mode. Initial time: %.2fs (25%% of runtime)\n", runtime * 0.25f);
+        _totalTime = runtime * 0.25f; // Start at 25% of runtime
+        
+        sf::Event ev = sf::Event();
+        sf::Clock clock;
+        while (_window && _window->isOpen())
         {
-            // Interactive mode
-            printf("Starting interactive mode.\n");
-            sf::Event ev = sf::Event();
-            sf::Clock clock;
-            while (_window && _window->isOpen())
-            {
-                while (_window->pollEvent(ev))
-                    ProcessEvent(ev);
+            while (_window->pollEvent(ev))
+                ProcessEvent(ev);
 
-                float dt = clock.restart().asSeconds();
-                _totalTime += dt;
+            // Don't accumulate time in single-frame mode unless we want it to animate?
+            // "If we are in --single-frame mode, we need to set the sun to 25% of that track."
+            // Assuming it should stay static at that point.
+            // But if it's interactive, maybe user wants to see animation?
+            // Usually single-frame implies static. But the loop suggests interactive.
+            // Let's assume static for now, or just let time run but start at 25%.
+            // Given "set the sun to 25% of that track", it implies a fixed point.
+            // But if I let it run, it will move away from 25%.
+            // Let's keep it static.
+            
+            // float dt = clock.restart().asSeconds();
+            // _totalTime += dt;
 
-                Render();
-                if (_window) _window->display();
-            }
+            Render();
+            if (_window) _window->display();
         }
-        else
-        {
-            // Video generation mode
-            printf("Starting video generation: %d fps, %.2f seconds.\n", fps, (double)runtime);
+    }
+    else
+    {
+        // Video generation mode
+        printf("Starting video generation: %d fps, %.2f seconds.\n", fps, (double)runtime);
             
             if (!std::filesystem::exists("output"))
                 std::filesystem::create_directory("output");
@@ -270,7 +319,7 @@ int main(int argc, char** argv)
 
                 _totalTime = static_cast<float>(i) / fps;
                 
-                UpdateScene(_totalTime); // Update scene state for current time
+                UpdateScene(_totalTime, runtime); // Update scene state for current time
                 Render();
                 if (_window) _window->display(); // Optional: show progress
 
@@ -367,6 +416,34 @@ int main(int argc, char** argv)
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
+    }
+
+    if (!_frameTimes.empty())
+    {
+        double sum = 0.0;
+        double minT = _frameTimes[0];
+        double maxT = _frameTimes[0];
+        for (double t : _frameTimes)
+        {
+            sum += t;
+            if (t < minT) minT = t;
+            if (t > maxT) maxT = t;
+        }
+        double mean = sum / _frameTimes.size();
+        
+        double sqSum = 0.0;
+        for (double t : _frameTimes)
+        {
+            sqSum += (t - mean) * (t - mean);
+        }
+        double stdDev = std::sqrt(sqSum / _frameTimes.size());
+        
+        printf("\nFrame Time Stats (ms):\n");
+        printf("  Count: %zu\n", _frameTimes.size());
+        printf("  Mean:  %.2f ms\n", mean);
+        printf("  Std:   %.2f ms\n", stdDev);
+        printf("  Min:   %.2f ms\n", minT);
+        printf("  Max:   %.2f ms\n", maxT);
     }
 
     return 0;
