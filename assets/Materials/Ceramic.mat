@@ -1,7 +1,7 @@
 {
-    "albedo": "Ceramic/Albedo.jpg",
-    "metallic": "Ceramic/Metallic.jpg",
-    "normal": "Ceramic/Normal.jpg",
-    "roughness": "Ceramic/Roughness.jpg",
+    "albedo": "assets/Materials/Ceramic/Albedo.jpg",
+    "metallic": "assets/Materials/Ceramic/Metallic.jpg",
+    "normal": "assets/Materials/Ceramic/Normal.png",
+    "roughness": "assets/Materials/Ceramic/Roughness.jpg",
     "alpha": 1.0
 }

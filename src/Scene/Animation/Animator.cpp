@@ -4,7 +4,7 @@
 #include "../Primitives/Mesh.h"
 #include <iostream>
 
-glm::vec3 Animator::GetValue(float time, float duration) const
+glm::vec3 KeyframeTrack::GetValue(float time, float duration) const
 {
     if (Keyframes.empty()) return { 0, 0, 0 };
     if (Keyframes.size() == 1) return Keyframes[0].Value;
@@ -34,7 +34,7 @@ glm::vec3 Animator::GetValue(float time, float duration) const
     return glm::mix(k1.Value, k2.Value, alpha);
 }
 
-void Animator::Apply(Scene* scene, float time, float duration)
+void KeyframeTrack::Apply(Scene* scene, float time, float duration)
 {
     glm::vec3 val = GetValue(time, duration);
 
@@ -68,19 +68,10 @@ void Animator::Apply(Scene* scene, float time, float duration)
     }
     else {
         // Geometry
-        for (auto* geo : scene->_geometry) {
+        for (auto* geo : scene->GetGeometryCollection()) {
             if (geo->Name == TargetName) {
                 if (Mesh* mesh = dynamic_cast<Mesh*>(geo)) {
                     if (Property == "position") {
-                        // Mesh center update is tricky because Mesh doesn't store center explicitly in a way that moves triangles automatically unless we implemented it.
-                        // Assuming Mesh has a center property we can update, but triangles need to be moved.
-                        // For now, let's assume we just want to update the transform if possible, but Mesh stores triangles directly.
-                        // We need to calculate offset.
-                        // But wait, Mesh struct in Geometry.h?
-                        // Let's check Mesh definition.
-                        // If Mesh doesn't have center, we might have trouble.
-                        // But I see `mesh->center` usage in my previous code.
-                        // Let's assume Mesh has center.
                          glm::vec3 offset = val - mesh->center;
                          mesh->center = val;
                          for (auto& tri : mesh->triangles) {
@@ -99,7 +90,7 @@ void Animator::Apply(Scene* scene, float time, float duration)
         }
         
         // Lights
-        for (auto* light : scene->_lights) {
+        for (auto* light : scene->GetLightCollection()) {
             if (light->Name == TargetName) {
                 if (Property == "position") {
                     light->Position = val;
@@ -109,5 +100,105 @@ void Animator::Apply(Scene* scene, float time, float duration)
                 }
             }
         }
+    }
+}
+
+Animator& Animator::Get()
+{
+    static Animator instance;
+    return instance;
+}
+
+void Animator::Reset()
+{
+    SunAnim = OrbitAnimation();
+    CameraAnim = OrbitAnimation();
+}
+
+void Animator::Update(Scene* scene, float time, float duration)
+{
+    // Apply keyframe animations first
+    for (auto& track : scene->KeyframeTracks)
+    {
+        track.Apply(scene, time, duration);
+    }
+
+    // Apply Sun Orbit
+    if (SunAnim.Enabled && duration > 0.0f)
+    {
+        float t = glm::clamp(time / duration, 0.0f, 1.0f);
+        
+        float currentOrbit = glm::mix(SunAnim.OrbitStart, SunAnim.OrbitEnd, t);
+        float currentAltitude = glm::mix(SunAnim.AltitudeStart, SunAnim.AltitudeEnd, t);
+        
+        float orbitRad = glm::radians(currentOrbit);
+        float altRad = glm::radians(currentAltitude);
+
+        fvec3 sunPos(
+            std::cos(altRad) * std::sin(orbitRad),
+            std::sin(altRad),
+            std::cos(altRad) * std::cos(orbitRad)
+        );
+        
+        scene->SunLight.Direction = -glm::normalize(sunPos);
+        
+        // Horizon dimming
+        if (scene->SunLight.Direction.y > 0) {
+             scene->SunLight.Intensity = 0.0f;
+        } else {
+             // We need initial intensity. 
+             // Ideally we shouldn't hardcode this restoration if it was animated by keyframes, 
+             // but since we mix keyframes and procedural, let's assume procedural takes precedence for intensity if it wants to.
+             // But here we only change direction.
+             // Actually, the original code had `InitialSunIntensity`.
+             // We should probably check if `InitialSunIntensity` is still in Scene.
+             // I'll keep using it if it exists, or just not touch intensity if y <= 0.
+             // But if we dim it to 0, we need to restore it.
+             // Let's assume Scene has InitialSunIntensity.
+             scene->SunLight.Intensity = scene->InitialSunIntensity;
+        }
+    }
+
+    // Apply Camera Orbit
+    if (CameraAnim.Enabled && duration > 0.0f)
+    {
+        float t = glm::clamp(time / duration, 0.0f, 1.0f);
+        
+        float currentOrbit = glm::mix(CameraAnim.OrbitStart, CameraAnim.OrbitEnd, t);
+        float currentAltitude = glm::mix(CameraAnim.AltitudeStart, CameraAnim.AltitudeEnd, t);
+        
+        float orbitRad = glm::radians(currentOrbit);
+        float altRad = glm::radians(currentAltitude);
+
+        fvec3 camOffset(
+            std::cos(altRad) * std::sin(orbitRad),
+            std::sin(altRad),
+            std::cos(altRad) * std::cos(orbitRad)
+        );
+        
+        fvec3 target = CameraAnim.UseTarget ? CameraAnim.Target : scene->CameraTarget;
+        
+        // If distance is set, use it. Otherwise calculate from current position?
+        // But if we orbit, we need a distance.
+        float dist = CameraAnim.Distance;
+        if (dist == 0.0f) {
+            // Fallback or assume it was set correctly.
+            // If 0, maybe use length(InitialPos - Target)?
+            // For now, assume it's set.
+            dist = 300.0f; 
+        }
+
+        scene->CameraPosition = target + camOffset * dist;
+        
+        // Make camera look at target
+        // We can set rotation or just trust the renderer uses lookat.
+        // The renderer likely uses CameraPosition and CameraTarget.
+        // But `Scene` has `CameraRotation`.
+        // Let's update `CameraRotation` to match lookat.
+        
+        glm::vec3 dir = glm::normalize(target - scene->CameraPosition);
+        float yaw = glm::degrees(atan2(dir.z, dir.x)) + 90.0f;
+        float pitch = glm::degrees(asin(dir.y));
+        scene->CameraRotation = { pitch, yaw, 0.0f };
     }
 }

@@ -79,44 +79,7 @@ void UpdateScene(float time, float duration)
     // Update Animators
     _scene->Update(time, duration);
 
-    // Rotate Sun (Legacy / Procedural fallback)
-    if (_scene->SunRotationSpeed != 0.0f)
-    {
-        // Orbit around Y axis (on XZ plane)
-        // SunRotationSpeed is in radians/second
-        float currentOrbitRad = glm::radians(_scene->SunOrbitStart) + time * _scene->SunRotationSpeed;
-        float altitudeRad = glm::radians(_scene->SunAltitudeStart);
 
-        // Calculate Sun Position (Y is Up)
-        fvec3 sunPos(
-            std::cos(altitudeRad) * std::sin(currentOrbitRad),
-            std::sin(altitudeRad),
-            std::cos(altitudeRad) * std::cos(currentOrbitRad)
-        );
-
-        // Direction is from Sun to Origin
-        _scene->SunLight.Direction = -glm::normalize(sunPos);
-
-        // Horizon check: If direction is pointing UP (y > 0), it's below horizon -> intensity 0
-        if (_scene->SunLight.Direction.y > 0)
-        {
-            _scene->SunLight.Intensity = 0.0f;
-        }
-        else
-        {
-            _scene->SunLight.Intensity = _scene->InitialSunIntensity;
-        }
-    }
-
-    // Rotate Camera
-    if (_scene->CameraRotationSpeed != 0.0f)
-    {
-        float angle = time * _scene->CameraRotationSpeed;
-        // Rotate around CameraTarget (Y axis)
-        fvec3 relativePos = _scene->InitialCameraPosition - _scene->CameraTarget;
-        relativePos = glm::rotateY(relativePos, angle);
-        _scene->CameraPosition = _scene->CameraTarget + relativePos;
-    }
 }
 
 void Render()
@@ -197,6 +160,7 @@ int main(int argc, char** argv)
     bool noTransparency = false;
     bool noReflections = false;
     int stratifiedSamples = Constants::DEFAULT_STRATIFIED_SAMPLES;
+    std::string outputFile = "";
 
     app.add_option("--scene", scenePath, "Path to scene file");
     app.add_option("--width", resolutionX, "Output width");
@@ -204,6 +168,7 @@ int main(int argc, char** argv)
     app.add_option("--fps", fps, "Frames per second");
     app.add_option("--runtime", runtime, "Runtime in seconds");
     app.add_option("--stratified-samples", stratifiedSamples, "Number of stratified samples per dimension (e.g. 2 means 4 samples/pixel)");
+    app.add_option("--output", outputFile, "Output video filename");
     app.add_flag("--single-frame", singleFrame, "Run in interactive single-frame mode");
     app.add_flag("--no-transparency", noTransparency, "Disable transparency");
     app.add_flag("--no-reflections", noReflections, "Disable reflections");
@@ -300,9 +265,22 @@ int main(int argc, char** argv)
             
             // Create a temporary directory for frames
             std::string framesDir = "output/" + timestamp + "_frames";
-            std::filesystem::create_directory(framesDir);
+            std::filesystem::create_directories(framesDir);
             
-            std::string videoFilename = "output/" + timestamp + ".mp4";
+            std::string videoFilename;
+            if (!outputFile.empty())
+            {
+                videoFilename = outputFile;
+                std::filesystem::path p(videoFilename);
+                if (p.has_parent_path())
+                {
+                    std::filesystem::create_directories(p.parent_path());
+                }
+            }
+            else
+            {
+                videoFilename = "output/" + timestamp + ".mp4";
+            }
 
             int width = resolutionX;
             int height = resolutionY;

@@ -15,7 +15,7 @@ class Scene;
 /**
  * @brief Handles keyframe-based animation for scene objects.
  */
-class Animator {
+class KeyframeTrack {
 public:
     /** @brief Target object name (e.g. "sun", "camera", or geometry name). */
     std::string TargetName;
@@ -41,4 +41,34 @@ public:
      * @param duration Total runtime duration in seconds.
      */
     void Apply(Scene* scene, float time, float duration);
+};
+
+struct OrbitAnimation {
+    bool Enabled = false;
+    float OrbitStart = 0.0f;
+    float OrbitEnd = 0.0f;
+    float AltitudeStart = 45.0f;
+    float AltitudeEnd = 45.0f;
+    
+    // For camera only
+    float Distance = 0.0f;
+    glm::vec3 Target = { 0, 0, 0 };
+    bool UseTarget = false;
+};
+
+/**
+ * @brief Singleton class that controls scene animations.
+ */
+class Animator {
+public:
+    static Animator& Get();
+
+    OrbitAnimation SunAnim;
+    OrbitAnimation CameraAnim;
+
+    void Reset();
+    void Update(Scene* scene, float time, float duration);
+
+private:
+    Animator() = default;
 };

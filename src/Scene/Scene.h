@@ -22,12 +22,8 @@ class Geometry;
 class Scene
 {
     friend class Animator;
+    friend class KeyframeTrack;
 public:
-    /** @brief Camera rotation speed in radians per second. */
-    float CameraRotationSpeed = 0.0f;
-    /** @brief Sun rotation speed in radians per second. */
-    float SunRotationSpeed = 0.0f;
-    
     /** @brief Current camera position in world space. */
     fvec3 CameraPosition = { 0, 0, -500 };
     /** @brief Initial camera position used for animation. */
@@ -39,12 +35,6 @@ public:
 
     /** @brief Directional light representing the sun. */
     DirectionalLight SunLight;
-    /** @brief Initial sun orbit angle in degrees. */
-    float SunOrbitStart = 0.0f;
-    float SunOrbitEnd = 0.0f;
-    /** @brief Sun altitude angle in degrees. */
-    float SunAltitudeStart = 45.0f;
-    float SunAltitudeEnd = 45.0f;
     /** @brief Initial sun intensity used for animation. */
     float InitialSunIntensity = 1.0f;
 
@@ -53,8 +43,8 @@ public:
     /** @brief Ambient light intensity scalar. */
     float AmbientIntensity = 0.1f;
 
-    /** @brief Animators attached to the scene. */
-    std::vector<Animator> Animators;
+    /** @brief Keyframe tracks attached to the scene. */
+    std::vector<KeyframeTrack> KeyframeTracks;
 
     /** @brief Camera rotation in degrees (pitch, yaw, roll). */
     fvec3 CameraRotation = { 0, 0, 0 };
@@ -126,4 +116,3 @@ public:
      */
     bool IntersectsAny(const Ray& ray) const;
 };
-

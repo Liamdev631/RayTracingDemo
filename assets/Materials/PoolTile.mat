@@ -1,7 +1,7 @@
 {
-    "albedo": "PoolTile/Albedo.jpg",
-    "normal": "PoolTile/Normal.jpg",
-    "roughness": 0.1
-    "metallic" 0.3
+    "albedo": "assets/Materials/PoolTile/Albedo.jpg",
+    "normal": "assets/Materials/PoolTile/Normal.jpg",
+    "roughness": 0.1,
+    "metallic": 0.3,
     "alpha": 1.0
 }

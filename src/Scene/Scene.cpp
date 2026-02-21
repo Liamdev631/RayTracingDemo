@@ -86,51 +86,5 @@ bool Scene::IntersectsAny(const Ray& ray) const
 
 void Scene::Update(float time, float duration)
 {
-    // Apply keyframe animations first (if any)
-    for (auto& animator : Animators)
-    {
-        animator.Apply(this, time, duration);
-    }
-
-    // Apply linear sun interpolation
-    if (duration > 0.0f)
-    {
-        float t = glm::clamp(time / duration, 0.0f, 1.0f);
-        
-        float currentOrbit = glm::mix(SunOrbitStart, SunOrbitEnd, t);
-        float currentAltitude = glm::mix(SunAltitudeStart, SunAltitudeEnd, t);
-        
-        float orbitRad = glm::radians(currentOrbit);
-        float altRad = glm::radians(currentAltitude);
-
-        // Y is Up.
-        // Orbit is rotation around Y axis (azimuth).
-        // Altitude is angle from XZ plane.
-        // x = cos(alt) * sin(orbit)
-        // y = sin(alt)
-        // z = cos(alt) * cos(orbit)
-        fvec3 sunPos(
-            std::cos(altRad) * std::sin(orbitRad),
-            std::sin(altRad),
-            std::cos(altRad) * std::cos(orbitRad)
-        );
-        
-        // Direction is from Sun to Origin, so negative of Position (assuming Origin is 0,0,0)
-        SunLight.Direction = -glm::normalize(sunPos);
-        
-        // Optional: Horizon dimming
-        // If direction is pointing UP (y > 0), it's below horizon -> intensity 0
-        // Wait, SunLight.Direction is from Sun to Origin.
-        // So if Sun is at (0, 100, 0), direction is (0, -1, 0).
-        // If Sun is below horizon (0, -100, 0), direction is (0, 1, 0).
-        // So if direction.y > 0, Sun is below horizon.
-        if (SunLight.Direction.y > 0)
-        {
-             SunLight.Intensity = 0.0f;
-        }
-        else
-        {
-             SunLight.Intensity = InitialSunIntensity;
-        }
-    }
+    Animator::Get().Update(this, time, duration);
 }

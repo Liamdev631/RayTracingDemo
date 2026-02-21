@@ -1,9 +1,9 @@
 @echo off
 set SCENE=%~1
-if "%SCENE%"=="" set SCENE=scenes\glass_test.scene
+if "%SCENE%"=="" set SCENE=scenes\material_test_4x4.scene
 
-set WIDTH=256
-set HEIGHT=256
+set WIDTH=512
+set HEIGHT=512
 set SAMPLES=4
 set DURATION=10.0
 

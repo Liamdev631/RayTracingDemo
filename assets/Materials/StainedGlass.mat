@@ -1,6 +1,6 @@
 {
-    "albedo": "StainedGlass/Albedo.jpg",
-    "alpha": "StainedGlass/Metallic.jpg",
+    "albedo": "assets/Materials/StainedGlass/Albedo.jpg",
+    "alpha": "assets/Materials/StainedGlass/Alpha.png",
     "roughness": 0.1,
     "metallic": 0.1
 }

@@ -17,6 +17,7 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "../Scene/Animation/Animator.h"
 
 using json = nlohmann::json;
 using namespace std;
@@ -50,115 +51,152 @@ private:
         return nullptr;
     }
 
+    /**
+     * @brief Parses a material from a JSON object or loads it from a file.
+     * @param j The JSON object containing material properties or a reference to a material file.
+     * @param scene The scene to load textures into.
+     * @param cache A cache mapping texture paths to texture indices.
+     * @return A shared pointer to the parsed material.
+     */
     static shared_ptr<PBRMaterial> ParseMaterial(const json& j, Scene* scene, std::map<string, int>& cache)
     {
         auto mat = make_shared<PBRMaterial>();
-        
-        // Default color (white)
-        mat->albedoColor = fvec3(1.0f);
+        mat->albedoColor = fvec3(1.0f); // Default white
 
-        // Check for simple texture (legacy or simple assignment)
-        if (j.contains("texture"))
-        {
-            if (j["texture"].is_string())
-            {
-                mat->albedoMap = GetOrLoadTexture(scene, cache, j["texture"]);
+        // Helper lambda to parse material properties from a JSON object
+        auto parseProps = [&](const json& m) {
+            // Albedo
+            if (m.contains("albedo")) {
+                if (m["albedo"].is_string()) {
+                    // Try to load as texture
+                    const sf::Image* img = nullptr;
+                    string path = m["albedo"];
+                    if (cache.find(path) != cache.end()) img = scene->GetTexture(cache[path]);
+                    else {
+                        int idx = scene->AddTexture(path);
+                        if (idx != -1) { cache[path] = idx; img = scene->GetTexture(idx); }
+                    }
+                    if (img) mat->albedoMap = img;
+                } else if (m["albedo"].is_array()) {
+                    mat->albedoColor = { m["albedo"][0], m["albedo"][1], m["albedo"][2] };
+                }
             }
-            else if (j["texture"].is_number_integer())
+            
+            // Color (legacy/alias for albedo color)
+            if (m.contains("color")) {
+                mat->albedoColor = { m["color"][0], m["color"][1], m["color"][2] };
+            }
+
+            // Roughness
+            if (m.contains("roughness")) {
+                if (m["roughness"].is_string()) {
+                     const sf::Image* img = nullptr;
+                     string path = m["roughness"];
+                     if (cache.find(path) != cache.end()) img = scene->GetTexture(cache[path]);
+                     else {
+                         int idx = scene->AddTexture(path);
+                         if (idx != -1) { cache[path] = idx; img = scene->GetTexture(idx); }
+                     }
+                     if (img) mat->roughnessMap = img;
+                }
+                else mat->roughnessVal = m["roughness"];
+            }
+
+            // Metallic
+            if (m.contains("metallic")) {
+                if (m["metallic"].is_string()) {
+                     const sf::Image* img = nullptr;
+                     string path = m["metallic"];
+                     if (cache.find(path) != cache.end()) img = scene->GetTexture(cache[path]);
+                     else {
+                         int idx = scene->AddTexture(path);
+                         if (idx != -1) { cache[path] = idx; img = scene->GetTexture(idx); }
+                     }
+                     if (img) mat->metallicMap = img;
+                }
+                else mat->metallicVal = m["metallic"];
+            }
+
+            // Normal
+            if (m.contains("normal") && m["normal"].is_string()) {
+                 const sf::Image* img = nullptr;
+                 string path = m["normal"];
+                 if (cache.find(path) != cache.end()) img = scene->GetTexture(cache[path]);
+                 else {
+                     int idx = scene->AddTexture(path);
+                     if (idx != -1) { cache[path] = idx; img = scene->GetTexture(idx); }
+                 }
+                 if (img) mat->normalMap = img;
+            }
+
+            // Alpha
+            if (m.contains("alpha")) {
+                if (m["alpha"].is_string()) {
+                     const sf::Image* img = nullptr;
+                     string path = m["alpha"];
+                     if (cache.find(path) != cache.end()) img = scene->GetTexture(cache[path]);
+                     else {
+                         int idx = scene->AddTexture(path);
+                         if (idx != -1) { cache[path] = idx; img = scene->GetTexture(idx); }
+                     }
+                     if (img) mat->alphaMap = img;
+                }
+                else mat->alphaVal = m["alpha"];
+            }
+        };
+
+        // 1. Load Base Material
+        if (j.contains("material"))
+        {
+            if (j["material"].is_string())
             {
+                // Load from .mat file
+                string matPath = j["material"];
+                ifstream matFile("assets/Materials/" + matPath); // Try relative to assets/Materials first
+                if (!matFile.is_open())
+                {
+                     matFile.open(matPath); // Try absolute or relative to CWD
+                }
+                
+                if (matFile.is_open())
+                {
+                    json matJson;
+                    matFile >> matJson;
+                    parseProps(matJson);
+                }
+                else
+                {
+                    cerr << "Failed to load material file: " << matPath << endl;
+                }
+            }
+            else if (j["material"].is_object())
+            {
+                // Inline material definition
+                parseProps(j["material"]);
+            }
+        }
+
+        // 2. Apply Overrides (Top-level properties on the object)
+        // These overwrite whatever was loaded from the base material
+        parseProps(j); 
+        
+        // Handle legacy "texture" property as albedo map override
+        if (j.contains("texture")) {
+            if (j["texture"].is_string()) {
+                 const sf::Image* img = nullptr;
+                 string path = j["texture"];
+                 if (cache.find(path) != cache.end()) img = scene->GetTexture(cache[path]);
+                 else {
+                     int idx = scene->AddTexture(path);
+                     if (idx != -1) { cache[path] = idx; img = scene->GetTexture(idx); }
+                 }
+                 if (img) mat->albedoMap = img;
+            } else if (j["texture"].is_number_integer()) {
                 int idx = j["texture"];
                 mat->albedoMap = scene->GetTexture(idx);
             }
         }
-        
-        // Check for color (legacy)
-        if (j.contains("color"))
-        {
-             mat->albedoColor = {
-                j["color"][0].get<float>(),
-                j["color"][1].get<float>(),
-                j["color"][2].get<float>()
-            };
-        }
 
-        // Check for top-level PBR properties (if not inside material)
-        if (j.contains("roughness"))
-        {
-             if (j["roughness"].is_number()) mat->roughnessVal = j["roughness"];
-             else if (j["roughness"].is_string()) mat->roughnessMap = GetOrLoadTexture(scene, cache, j["roughness"]);
-        }
-        if (j.contains("metallic"))
-        {
-             if (j["metallic"].is_number()) mat->metallicVal = j["metallic"];
-             else if (j["metallic"].is_string()) mat->metallicMap = GetOrLoadTexture(scene, cache, j["metallic"]);
-        }
-
-        // Advanced PBR material
-        if (j.contains("material"))
-        {
-            auto& m = j["material"];
-            
-            // Albedo
-            if (m.contains("albedo"))
-            {
-                if (m["albedo"].is_string())
-                {
-                    mat->albedoMap = GetOrLoadTexture(scene, cache, m["albedo"]);
-                }
-                else if (m["albedo"].is_array())
-                    mat->albedoColor = { m["albedo"][0], m["albedo"][1], m["albedo"][2] };
-            }
-            
-            // Color (inside material)
-            if (m.contains("color"))
-            {
-                mat->albedoColor = {
-                    m["color"][0].get<float>(),
-                    m["color"][1].get<float>(),
-                    m["color"][2].get<float>()
-                };
-            }
-            
-            // Roughness
-            if (m.contains("roughness"))
-            {
-                if (m["roughness"].is_string())
-                    mat->roughnessMap = GetOrLoadTexture(scene, cache, m["roughness"]);
-                else
-                    mat->roughnessVal = m["roughness"];
-            }
-            
-            // Metallic
-            if (m.contains("metallic"))
-            {
-                if (m["metallic"].is_string())
-                    mat->metallicMap = GetOrLoadTexture(scene, cache, m["metallic"]);
-                else
-                    mat->metallicVal = m["metallic"];
-            }
-            
-            // Normal
-            if (m.contains("normal"))
-            {
-                 mat->normalMap = GetOrLoadTexture(scene, cache, m["normal"]);
-            }
-            
-            // Gloss
-            if (m.contains("gloss"))
-            {
-                 mat->glossMap = GetOrLoadTexture(scene, cache, m["gloss"]);
-            }
-
-            // Alpha
-            if (m.contains("alpha"))
-            {
-                if (m["alpha"].is_string())
-                    mat->alphaMap = GetOrLoadTexture(scene, cache, m["alpha"]);
-                else if (m["alpha"].is_number())
-                    mat->alphaVal = m["alpha"];
-            }
-        }
-        
         return mat;
     }
 
@@ -182,64 +220,101 @@ public:
 
         auto scene = make_shared<Scene>();
         std::map<string, int> textureCache;
+        
+        // Reset Animator Singleton
+        Animator::Get().Reset();
 
-                // Load Scene Settings (Camera, Animation, Sky Light, Ambient)
-                bool hasDirectionalLight = false;
-                if (j.contains("settings"))
-                {
-                    auto& settings = j["settings"];
-                    if (settings.contains("camera"))
-                {
-                    auto& cam = settings["camera"];
-                    if (cam.contains("position")) {
-                        scene->CameraPosition = { cam["position"][0], cam["position"][1], cam["position"][2] };
-                        scene->InitialCameraPosition = scene->CameraPosition;
-                    }
-                    if (cam.contains("target")) {
-                        scene->CameraTarget = { cam["target"][0], cam["target"][1], cam["target"][2] };
-                    }
-                    if (cam.contains("fov")) {
-                        scene->CameraFOV = cam["fov"].get<float>();
-                    }
+        // Load Scene Settings (Camera, Animation, Sky Light, Ambient)
+        bool hasDirectionalLight = false;
+        if (j.contains("settings"))
+        {
+            auto& settings = j["settings"];
+            if (settings.contains("camera"))
+            {
+                auto& cam = settings["camera"];
+                if (cam.contains("position")) {
+                    scene->CameraPosition = { cam["position"][0], cam["position"][1], cam["position"][2] };
+                    scene->InitialCameraPosition = scene->CameraPosition;
+                }
+                if (cam.contains("target")) {
+                    scene->CameraTarget = { cam["target"][0], cam["target"][1], cam["target"][2] };
+                }
+                if (cam.contains("fov")) {
+                    scene->CameraFOV = cam["fov"].get<float>();
                 }
                 
-                if (settings.contains("animation"))
+                // Camera Animation
+                if (cam.contains("orbit_angle") || cam.contains("altitude")) {
+                    auto& anim = Animator::Get().CameraAnim;
+                    anim.Enabled = true;
+                    anim.Target = scene->CameraTarget;
+                    anim.UseTarget = true;
+                    
+                    if (cam.contains("orbit_angle")) {
+                        if (cam["orbit_angle"].is_array()) {
+                            anim.OrbitStart = cam["orbit_angle"][0];
+                            anim.OrbitEnd = cam["orbit_angle"][1];
+                        } else {
+                            anim.OrbitStart = cam["orbit_angle"];
+                            anim.OrbitEnd = anim.OrbitStart;
+                        }
+                    }
+                    
+                    if (cam.contains("altitude")) {
+                        if (cam["altitude"].is_array()) {
+                            anim.AltitudeStart = cam["altitude"][0];
+                            anim.AltitudeEnd = cam["altitude"][1];
+                        } else {
+                            anim.AltitudeStart = cam["altitude"];
+                            anim.AltitudeEnd = anim.AltitudeStart;
+                        }
+                    }
+                    
+                    if (cam.contains("orbit_distance")) {
+                        anim.Distance = cam["orbit_distance"];
+                    } else {
+                        anim.Distance = glm::length(scene->CameraPosition - scene->CameraTarget);
+                    }
+                }
+            }
+            
+            if (settings.contains("animation"))
             {
                 auto& anim = settings["animation"];
-                if (anim.contains("camera_speed"))
-                    scene->CameraRotationSpeed = anim["camera_speed"];
-                if (anim.contains("sun_speed"))
-                    scene->SunRotationSpeed = anim["sun_speed"];
+                // Legacy support if needed, but we rely on Animator now.
             }
 
             // Load Sky Light (formerly Directional Light)
             if (settings.contains("sky_light"))
             {
                 auto& sky = settings["sky_light"];
+                auto& sunAnim = Animator::Get().SunAnim;
                 
                 float orbit = 0.0f;
                 float altitude = 45.0f;
                 if (sky.contains("orbit_angle")) {
                     if (sky["orbit_angle"].is_array()) {
-                        scene->SunOrbitStart = sky["orbit_angle"][0];
-                        scene->SunOrbitEnd = sky["orbit_angle"][1];
-                        orbit = scene->SunOrbitStart;
+                        sunAnim.OrbitStart = sky["orbit_angle"][0];
+                        sunAnim.OrbitEnd = sky["orbit_angle"][1];
+                        orbit = sunAnim.OrbitStart;
+                        sunAnim.Enabled = true;
                     } else {
                         orbit = sky["orbit_angle"];
-                        scene->SunOrbitStart = orbit;
-                        scene->SunOrbitEnd = orbit;
+                        sunAnim.OrbitStart = orbit;
+                        sunAnim.OrbitEnd = orbit;
                     }
                 }
                 
                 if (sky.contains("altitude")) {
                     if (sky["altitude"].is_array()) {
-                        scene->SunAltitudeStart = sky["altitude"][0];
-                        scene->SunAltitudeEnd = sky["altitude"][1];
-                        altitude = scene->SunAltitudeStart;
+                        sunAnim.AltitudeStart = sky["altitude"][0];
+                        sunAnim.AltitudeEnd = sky["altitude"][1];
+                        altitude = sunAnim.AltitudeStart;
+                        sunAnim.Enabled = true;
                     } else {
                         altitude = sky["altitude"];
-                        scene->SunAltitudeStart = altitude;
-                        scene->SunAltitudeEnd = altitude;
+                        sunAnim.AltitudeStart = altitude;
+                        sunAnim.AltitudeEnd = altitude;
                     }
                 }
 
@@ -470,26 +545,21 @@ public:
                     };
                     
                     auto mat = ParseMaterial(objData, scene.get(), textureCache);
-                    auto tri = new Triangle(v0, v1, v2, mat->albedoColor);
-                    tri->SetMaterial(mat);
-                    
-                    if (objData.contains("uvs"))
-                    {
-                        auto& uvs = objData["uvs"];
-                        fvec2 uv0 = { uvs[0][0], uvs[0][1] };
-                        fvec2 uv1 = { uvs[1][0], uvs[1][1] };
-                        fvec2 uv2 = { uvs[2][0], uvs[2][1] };
-                        tri->SetUVs(uv0, uv1, uv2);
-                    }
-                    
+                    auto tri = new GeometryTriangle(v0, v1, v2, mat);
                     if (objData.contains("name")) tri->Name = objData["name"];
+                    
+                    if (objData.contains("uvs") && objData["uvs"].is_array() && objData["uvs"].size() == 6)
+                    {
+                         fvec2 uv0 = { objData["uvs"][0], objData["uvs"][1] };
+                         fvec2 uv1 = { objData["uvs"][2], objData["uvs"][3] };
+                         fvec2 uv2 = { objData["uvs"][4], objData["uvs"][5] };
+                         tri->SetUVs(uv0, uv1, uv2);
+                    }
+
                     scene->AddGeometry(tri);
                 }
                 else if (type == "mesh")
                 {
-                    vector<Triangle> triangles;
-                    auto mat = ParseMaterial(objData, scene.get(), textureCache);
-
                     if (objData.contains("file"))
                     {
                         string filePath = objData["file"];
@@ -528,141 +598,97 @@ public:
                         // Scale
                         if (objData.contains("scale"))
                         {
-                            fvec3 s = { 1.0f, 1.0f, 1.0f };
-                            if (objData["scale"].is_array())
+                             fvec3 scale = { 1, 1, 1 };
+                             if (objData["scale"].is_array())
+                                 scale = { objData["scale"][0], objData["scale"][1], objData["scale"][2] };
+                             else if (objData["scale"].is_number())
+                             {
+                                 float s = objData["scale"];
+                                 scale = { s, s, s };
+                             }
+                             transform = glm::scale(transform, scale);
+                             hasTransform = true;
+                        }
+                        
+                        fvec2 uvScale = { 1.0f, 1.0f };
+                        if (objData.contains("uv_scale"))
+                        {
+                            if (objData["uv_scale"].is_array())
                             {
-                                s = {
-                                    objData["scale"][0].get<float>(),
-                                    objData["scale"][1].get<float>(),
-                                    objData["scale"][2].get<float>()
-                                };
+                                uvScale.x = objData["uv_scale"][0];
+                                uvScale.y = objData["uv_scale"][1];
                             }
-                            else if (objData["scale"].is_number())
+                            else if (objData["uv_scale"].is_number())
                             {
-                                float val = objData["scale"].get<float>();
-                                s = { val, val, val };
+                                float s = objData["uv_scale"];
+                                uvScale = { s, s };
                             }
-                            transform = glm::scale(transform, s);
-                            hasTransform = true;
                         }
 
-                        if (hasTransform)
+                        // Apply transform to all parts
+                        for (auto& part : loadedParts)
                         {
-                            for (auto& part : loadedParts)
+                            if (hasTransform)
                             {
-                                for (auto& tri : part.triangles)
+                                for (auto& tri : part->triangles)
                                 {
-                                    // Transform vertices
                                     tri.v0 = fvec3(transform * fvec4(tri.v0, 1.0f));
                                     tri.v1 = fvec3(transform * fvec4(tri.v1, 1.0f));
                                     tri.v2 = fvec3(transform * fvec4(tri.v2, 1.0f));
-                                    
-                                    // Recalculate normal
-                                    fvec3 edge1 = tri.v1 - tri.v0;
-                                    fvec3 edge2 = tri.v2 - tri.v0;
-                                    tri.normal = glm::normalize(glm::cross(edge1, edge2));
-                                    
-                                    // Recalculate tangent
-                                    tri.CalculateTangent();
+                                    // Normals should be transformed by inverse transpose, but for uniform scale/rotation, this is approx ok, or we need proper handling.
+                                    // For now, let's just recompute normals or assume they are close enough.
+                                    // Actually, if we rotate, normals MUST rotate.
+                                    // Correct way: transform normal by mat3(transpose(inverse(transform)))
+                                    glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(transform)));
+                                    tri.n0 = glm::normalize(normalMat * tri.n0);
+                                    tri.n1 = glm::normalize(normalMat * tri.n1);
+                                    tri.n2 = glm::normalize(normalMat * tri.n2);
                                 }
+                                part->center = fvec3(transform * fvec4(part->center, 1.0f));
+                                part->radius = 0; // Recompute? For now, leave it.
                             }
-                        }
-
-                        for (const auto& part : loadedParts)
-                        {
-                            triangles.insert(triangles.end(), part.triangles.begin(), part.triangles.end());
-                        }
-                    }
-
-                    if (objData.contains("triangles"))
-                    {
-                        for (const auto& triData : objData["triangles"])
-                        {
-                            fvec3 v0 = {
-                                triData["v0"][0].get<float>(),
-                                triData["v0"][1].get<float>(),
-                                triData["v0"][2].get<float>()
-                            };
-                            fvec3 v1 = {
-                                triData["v1"][0].get<float>(),
-                                triData["v1"][1].get<float>(),
-                                triData["v1"][2].get<float>()
-                            };
-                            fvec3 v2 = {
-                                triData["v2"][0].get<float>(),
-                                triData["v2"][1].get<float>(),
-                                triData["v2"][2].get<float>()
-                            };
-                            fvec3 color = { 1.0f, 1.0f, 1.0f };
-                            if (triData.contains("color"))
+                            
+                            // Apply material overrides if present
+                            // Note: MeshLoader already assigns a material, but we can override it via Scene JSON
+                            // If "material" is specified in the object block, it overrides ALL parts.
+                            // If not, it uses what's in the file.
+                            if (j.contains("material") || j.contains("texture") || j.contains("roughness") || j.contains("metallic"))
                             {
-                                color = {
-                                    triData["color"][0].get<float>(),
-                                    triData["color"][1].get<float>(),
-                                    triData["color"][2].get<float>()
-                                };
+                                auto overrideMat = ParseMaterial(objData, scene.get(), textureCache);
+                                // If override defines a property, use it. Otherwise keep original?
+                                // ParseMaterial returns a NEW material with defaults.
+                                // We probably want to MERGE.
+                                // But implementing merge is complex.
+                                // For now, if override is present, use it completely.
+                                part->material = overrideMat;
                             }
                             
-                            Triangle tri(v0, v1, v2, color);
-                            
-                            if (triData.contains("uvs"))
-                            {
-                                auto& uvs = triData["uvs"];
-                                fvec2 uv0 = { uvs[0][0], uvs[0][1] };
-                                fvec2 uv1 = { uvs[1][0], uvs[1][1] };
-                                fvec2 uv2 = { uvs[2][0], uvs[2][1] };
-                                tri.SetUVs(uv0, uv1, uv2);
-                            }
-                            
-                            triangles.push_back(tri);
+                            part->uvScale = uvScale;
+
+                            if (objData.contains("name")) part->Name = objData["name"];
+                            else part->Name = "MeshPart";
+
+                            scene->AddGeometry(part);
                         }
                     }
-                    
-                    // Assign material to all triangles
-                    for(auto& tri : triangles)
-                    {
-                        tri.SetMaterial(mat);
-                    }
-
-                    auto mesh = new Mesh(triangles, mat);
-                    if (objData.contains("name")) mesh->Name = objData["name"];
-                    scene->AddGeometry(mesh);
                 }
                 else if (type == "cube")
                 {
                     fvec3 center = { 0, 0, 0 };
                     if (objData.contains("center"))
                         center = { objData["center"][0], objData["center"][1], objData["center"][2] };
-                        
-                    float size = 100.0f;
-                    if (objData.contains("size"))
-                        size = objData["size"];
-                        
+                    
+                    float size = 50.0f;
+                    if (objData.contains("size")) size = objData["size"];
+
                     glm::mat4 transform(1.0f);
                     if (objData.contains("transform"))
                     {
                         auto& t = objData["transform"];
-                        // Assume row-major or column-major? GLM is column-major.
-                        // If JSON is just a list of 16 numbers, usually row-major in export, but let's assume standard GLM construction.
-                        // If 4x4 array:
-                        if (t.size() == 4 && t[0].is_array())
+                        if (t.size() == 16)
                         {
-                            for (int i = 0; i < 4; i++)
-                                for (int j = 0; j < 4; j++)
-                                    transform[i][j] = t[i][j]; // transform[col][row]
-                        }
-                        else if (t.size() == 16)
-                        {
-                            // Flat array
                              for (int i = 0; i < 16; i++)
-                                transform[i / 4][i % 4] = t[i]; // check this mapping
-                                // GLM mat4 constructor takes columns.
-                                // If input is row-major (common in JSON), we need to transpose or fill carefully.
-                                // Let's assume input is column-major flat array for now or just fill it.
-                                // Actually, make_mat4 takes a pointer.
-                                // Let's just iterate.
-                                // transform[col][row] in GLM.
-                                // If input is row-major: t[row*4 + col]
+                                transform[i / 4][i % 4] = t[i];
                         }
                     }
                     
@@ -689,12 +715,12 @@ public:
             }
         }
 
-        // Load Animators
+        // Load Animators (KeyframeTracks)
         if (j.contains("animators"))
         {
             for (const auto& animData : j["animators"])
             {
-                Animator anim;
+                KeyframeTrack anim;
                 anim.TargetName = animData["target"];
                 anim.Property = animData["property"];
                 if (animData.contains("normalized")) anim.NormalizedTime = animData["normalized"];
@@ -726,7 +752,7 @@ public:
                     });
                 }
                 
-                scene->Animators.push_back(anim);
+                scene->KeyframeTracks.push_back(anim);
             }
         }
 

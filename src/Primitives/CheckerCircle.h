@@ -10,6 +10,9 @@ public:
 	/** @brief Plane normal in world space. */
 	fvec3 normal;
 
+	/** @brief Tile size for checkerboard pattern. */
+	float TileSize = 50.0f;
+
 public:
 	/**
 	 * @brief Creates a checkerboard circle on a circular plane.

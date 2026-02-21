@@ -32,7 +32,7 @@ bool CheckerCircle::Intersects(const Scene* scene, const Ray& ray, Hit& outHit) 
 		outHit.Normal = normal;
 
 		// Checkerboard pattern
-		bool check = (int(floor(outHit.Position.x / 100.0f)) + int(floor(outHit.Position.z / 100.0f))) % 2 == 0;
+		bool check = (int(floor(outHit.Position.x / TileSize)) + int(floor(outHit.Position.z / TileSize))) % 2 == 0;
 		outHit.Color = check ? fvec3(0.9f) : fvec3(0.5f);
 		outHit.HitGeometry = this;
 
@@ -60,7 +60,7 @@ bool CheckerCircle::IntersectsAny(const Ray& ray) const
 
 void CheckerCircle::GetPBR(const fvec3& p, fvec3& outAlbedo, float& outRoughness, float& outMetallic, float& outAlpha, fvec3& outNormal) const
 {
-	bool check = (int(floor(p.x / 100.0f)) + int(floor(p.z / 100.0f))) % 2 == 0;
+	bool check = (int(floor(p.x / TileSize)) + int(floor(p.z / TileSize))) % 2 == 0;
 	outAlbedo = check ? fvec3(0.9f) : fvec3(0.5f);
 	// White tiles (check) get the base roughness (reflective), Dark tiles get 1.0 (matte)
 	outRoughness = check ? roughness : 0.9f; 
