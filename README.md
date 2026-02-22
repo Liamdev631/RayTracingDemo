@@ -35,3 +35,10 @@ This project uses CMake for build configuration and dependency management (Fetch
 - `src/Scene`: Geometric primitives, lights, and ray definitions.
 - `build.ps1`: Automated build script.
 - `CMakeLists.txt`: Build configuration.
+
+## Sample Output
+
+### Glass Test Scene
+Below is a sample rendering of the `glass_test` scene showcasing the three sample materials: Stained Glass, Ceramic, and Pool Tile.
+
+![Glass Test Render](assets/screenshots/glass_test_render.png)
