@@ -11,9 +11,25 @@ glm::vec3 KeyframeTrack::GetValue(float time, float duration) const
 
     // Determine effective time t
     float t = time;
+
+    // Apply looping if enabled (for non-normalized time)
+    if (Loop && !NormalizedTime && !Keyframes.empty())
+    {
+        float maxTime = Keyframes.back().Time;
+        if (maxTime > 0.0001f)
+        {
+            t = std::fmod(t, maxTime);
+        }
+    }
+
     if (NormalizedTime) {
         if (duration > 0) t = time / duration;
         else t = 0;
+        
+        if (Loop)
+        {
+             t = std::fmod(t, 1.0f);
+        }
     }
 
     // Find surrounding keyframes

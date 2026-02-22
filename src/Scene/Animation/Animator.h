@@ -25,6 +25,8 @@ public:
     std::vector<Keyframe> Keyframes;
     /** @brief If true, keyframe times are normalized [0,1] relative to runtime. */
     bool NormalizedTime = false;
+    /** @brief If true, the animation loops indefinitely. */
+    bool Loop = false;
 
     /**
      * @brief Interpolates value at given time.

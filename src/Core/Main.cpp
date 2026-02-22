@@ -17,27 +17,29 @@
 using namespace std;
 using namespace chrono_literals;
 
-int resolutionX = 640;
-int resolutionY = 480;
-int frameCount = 0;
+// Struct to hold application state
+struct AppState {
+    int resolutionX = 640;
+    int resolutionY = 480;
+    int frameCount = 0;
+    float totalTime = 0.0f;
+    float targetRuntime = 10.0f;
+    std::vector<double> frameTimes;
 
-// Global variables to replace Program class state
-std::unique_ptr<sf::RenderWindow> _window;
-std::unique_ptr<SceneRenderer> _renderer;
-std::shared_ptr<Scene> _scene;
-std::unique_ptr<sf::RectangleShape> _imageBox;
-std::unique_ptr<sf::Texture> _renderTargetFinal;
-float _totalTime = 0.0f;
-float _targetRuntime = 10.0f;
-std::vector<double> _frameTimes;
+    std::unique_ptr<sf::RenderWindow> window;
+    std::shared_ptr<Scene> scene;
+    std::unique_ptr<SceneRenderer> renderer;
+    std::unique_ptr<sf::RectangleShape> imageBox;
+    std::unique_ptr<sf::Texture> renderTargetFinal;
+};
 
-void SaveFrame()
+void SaveFrame(AppState& app)
 {
-    if (!_renderTargetFinal) return;
-    auto img = _renderTargetFinal->copyToImage();
+    if (!app.renderTargetFinal) return;
+    auto img = app.renderTargetFinal->copyToImage();
     
     std::ostringstream oss;
-    oss << "_" << std::setw(4) << std::setfill('0') << frameCount++;    
+    oss << "_" << std::setw(4) << std::setfill('0') << app.frameCount++;    
     
     if (!std::filesystem::exists("output"))
     {
@@ -52,77 +54,54 @@ void SaveFrame()
         printf("Failed to save frame to %s\n", filename.c_str());
 }
 
-void ProcessEvent(const sf::Event& ev) noexcept
+void ProcessEvent(AppState& app, const sf::Event& ev) noexcept
 {
-    if (!_window) return;
+    if (!app.window) return;
     if (ev.type == sf::Event::Closed)
     {
-        _window->close();
+        app.window->close();
     }
     if (ev.type == sf::Event::KeyPressed)
     {
         if (ev.key.code == sf::Keyboard::Escape)
         {
-            _window->close();
+            app.window->close();
         }
         else if (ev.key.code == sf::Keyboard::Space)
         {
-            SaveFrame();
+            SaveFrame(app);
         }
     }
 }
 
-void UpdateScene(float time, float duration)
+void UpdateScene(AppState& app, float time, float duration)
 {
-    if (!_scene) return;
+    if (!app.scene) return;
 
     // Update Animators
-    _scene->Update(time, duration);
-
-
+    app.scene->Update(time, duration);
 }
 
-void Render()
+void Render(AppState& app)
 {
-    if (!_window) return;
-    _window->clear(sf::Color::Magenta);
-    UpdateScene(_totalTime, _targetRuntime);    
+    if (!app.window) return;
+    app.window->clear(sf::Color::Magenta);
+    UpdateScene(app, app.totalTime, app.targetRuntime);    
     
     auto start = std::chrono::high_resolution_clock::now();
-    if (_renderer) _renderer->Render(_renderTargetFinal);
+    if (app.renderer) app.renderer->Render(app.renderTargetFinal);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> ms = end - start;
-    _frameTimes.push_back(ms.count());
+    app.frameTimes.push_back(ms.count());
 
-    if (_imageBox && _renderTargetFinal)
+    if (app.imageBox && app.renderTargetFinal)
     {
-        _imageBox->setTexture(_renderTargetFinal.get());
-        _window->draw(*_imageBox);
+        app.imageBox->setTexture(app.renderTargetFinal.get());
+        app.window->draw(*app.imageBox);
     }
 }
 
-void SetupScene(const std::string& sceneFile)
-{
-    srand(static_cast<unsigned int>(time(0)));
-
-    if (sceneFile.empty())
-    {
-        printf("Error: No scene file provided.\n");
-        exit(1);
-    }
-
-    printf("Loading scene from %s\n", sceneFile.c_str());
-    _scene = SceneLoader::LoadScene(sceneFile);
-    if (!_scene)
-    {
-        printf("Failed to load scene from %s, exiting.\n", sceneFile.c_str());
-        exit(1);
-    }
-
-    if (_renderer) _renderer->SetScene(_scene);
-}
-
-void SetupWindow()
+void SetupWindow(AppState& app)
 {
     printf("Creating the window.\n");
     sf::ContextSettings settings;
@@ -130,27 +109,30 @@ void SetupWindow()
     settings.depthBits = 16;
     settings.stencilBits = 0;
     
-    _window = std::make_unique<sf::RenderWindow>(sf::VideoMode(resolutionX, resolutionY), "Ray Tracing Demo", sf::Style::Default, settings);
-    _window->setVerticalSyncEnabled(true);
-    _window->setActive(true);
+    app.window = std::make_unique<sf::RenderWindow>(sf::VideoMode(app.resolutionX, app.resolutionY), "Ray Tracing Demo", sf::Style::Default, settings);
+    app.window->setVerticalSyncEnabled(true);
+    app.window->setActive(true);
 
-    _imageBox = std::make_unique<sf::RectangleShape>();
-    _imageBox->setSize({ (float)resolutionX, (float)resolutionY }); 
-    _imageBox->setPosition({ 0, 0 });
-    _imageBox->setFillColor(sf::Color::White);
+    app.imageBox = std::make_unique<sf::RectangleShape>();
+    app.imageBox->setSize({ (float)app.resolutionX, (float)app.resolutionY }); 
+    app.imageBox->setPosition({ 0, 0 });
+    app.imageBox->setFillColor(sf::Color::White);
 
-    _renderTargetFinal = make_unique<sf::Texture>();
-    _renderTargetFinal->create(resolutionX, resolutionY);
+    app.renderTargetFinal = make_unique<sf::Texture>();
+    app.renderTargetFinal->create(app.resolutionX, app.resolutionY);
     
-    _imageBox->setTexture(_renderTargetFinal.get());
+    app.imageBox->setTexture(app.renderTargetFinal.get());
 
-    _renderer = std::make_unique<SceneRenderer>(sf::Vector2u((unsigned int)resolutionX, (unsigned int)resolutionY));
+    app.renderer = std::make_unique<SceneRenderer>(sf::Vector2u((unsigned int)app.resolutionX, (unsigned int)app.resolutionY));
 }
 
 int main(int argc, char** argv)
 {
     std::cout << "RayTracingDemo Starting..." << std::endl;
     std::flush(std::cout);
+    
+    AppState appState;
+
     CLI::App app{ "Ray Tracing Demo" };
     
     std::string scenePath = "scenes/scene.json";
@@ -163,8 +145,8 @@ int main(int argc, char** argv)
     std::string outputFile = "";
 
     app.add_option("--scene", scenePath, "Path to scene file");
-    app.add_option("--width", resolutionX, "Output width");
-    app.add_option("--height", resolutionY, "Output height");
+    app.add_option("--width", appState.resolutionX, "Output width");
+    app.add_option("--height", appState.resolutionY, "Output height");
     app.add_option("--fps", fps, "Frames per second");
     app.add_option("--runtime", runtime, "Runtime in seconds");
     app.add_option("--stratified-samples", stratifiedSamples, "Number of stratified samples per dimension (e.g. 2 means 4 samples/pixel)");
@@ -175,7 +157,7 @@ int main(int argc, char** argv)
     
     CLI11_PARSE(app, argc, argv);
 
-    _targetRuntime = (float)runtime;
+    appState.targetRuntime = (float)runtime;
 
     std::cout << "Loading scene: " << scenePath << std::endl;
     
@@ -187,71 +169,57 @@ int main(int argc, char** argv)
 
     // Initialize Window and Renderer resources
     try {
-        SetupWindow();
+        SetupWindow(appState);
         
-        if (_renderer)
+        if (appState.renderer)
         {
-            _renderer->SetTransparency(!noTransparency);
-            _renderer->SetReflections(!noReflections);
-            _renderer->SetStratifiedSamples(stratifiedSamples);
+            appState.renderer->SetTransparency(!noTransparency);
+            appState.renderer->SetReflections(!noReflections);
+            appState.renderer->SetStratifiedSamples(stratifiedSamples);
             if (stratifiedSamples > 1)
-                _renderer->SetSamplingMethod(Constants::SamplingType::Stratified);
+                appState.renderer->SetSamplingMethod(Constants::SamplingType::Stratified);
             else
-                _renderer->SetSamplingMethod(Constants::SamplingType::Uniform);
+                appState.renderer->SetSamplingMethod(Constants::SamplingType::Uniform);
         }
 
         try {
-            _scene = SceneLoader::LoadScene(scenePath);
+            appState.scene = SceneLoader::LoadScene(scenePath);
         } catch (const std::exception& e) {
             std::cerr << "Exception loading scene: " << e.what() << std::endl;
             return 1;
         }
 
-    if (!_scene)
-    {
-        std::cerr << "Failed to load scene." << std::endl;
-        return 1;
-    }
-    
-    if (_renderer) _renderer->SetScene(_scene);
-    
-    std::cout << "Scene loaded successfully." << std::endl;
-
-    // Logic continues below (reusing existing code structure where possible)
-    if (singleFrame)
-    {
-        // Interactive mode
-        printf("Starting interactive mode. Initial time: %.2fs (25%% of runtime)\n", runtime * 0.25f);
-        _totalTime = runtime * 0.25f; // Start at 25% of runtime
-        
-        sf::Event ev = sf::Event();
-        sf::Clock clock;
-        while (_window && _window->isOpen())
+        if (!appState.scene)
         {
-            while (_window->pollEvent(ev))
-                ProcessEvent(ev);
-
-            // Don't accumulate time in single-frame mode unless we want it to animate?
-            // "If we are in --single-frame mode, we need to set the sun to 25% of that track."
-            // Assuming it should stay static at that point.
-            // But if it's interactive, maybe user wants to see animation?
-            // Usually single-frame implies static. But the loop suggests interactive.
-            // Let's assume static for now, or just let time run but start at 25%.
-            // Given "set the sun to 25% of that track", it implies a fixed point.
-            // But if I let it run, it will move away from 25%.
-            // Let's keep it static.
-            
-            // float dt = clock.restart().asSeconds();
-            // _totalTime += dt;
-
-            Render();
-            if (_window) _window->display();
+            std::cerr << "Failed to load scene." << std::endl;
+            return 1;
         }
-    }
-    else
-    {
-        // Video generation mode
-        printf("Starting video generation: %d fps, %.2f seconds.\n", fps, (double)runtime);
+        
+        if (appState.renderer) appState.renderer->SetScene(appState.scene);
+        
+        std::cout << "Scene loaded successfully." << std::endl;
+
+        if (singleFrame)
+        {
+            // Interactive mode
+            printf("Starting interactive mode. Initial time: %.2fs (25%% of runtime)\n", runtime * 0.25f);
+            appState.totalTime = runtime * 0.25f; // Start at 25% of runtime
+            
+            sf::Event ev = sf::Event();
+            sf::Clock clock;
+            while (appState.window && appState.window->isOpen())
+            {
+                while (appState.window->pollEvent(ev))
+                    ProcessEvent(appState, ev);
+
+                Render(appState);
+                if (appState.window) appState.window->display();
+            }
+        }
+        else
+        {
+            // Video generation mode
+            printf("Starting video generation: %d fps, %.2f seconds.\n", fps, (double)runtime);
             
             if (!std::filesystem::exists("output"))
                 std::filesystem::create_directory("output");
@@ -282,34 +250,34 @@ int main(int argc, char** argv)
                 videoFilename = "output/" + timestamp + ".mp4";
             }
 
-            int width = resolutionX;
-            int height = resolutionY;
+            int width = appState.resolutionX;
+            int height = appState.resolutionY;
             
             int totalFrames = static_cast<int>(fps * runtime);
             for (int i = 0; i < totalFrames; ++i)
             {
-                if (!_window || !_window->isOpen()) break;
+                if (!appState.window || !appState.window->isOpen()) break;
 
                 // Handle window events just to keep OS happy (and allow closing)
                 sf::Event ev;
-                while (_window->pollEvent(ev))
-                    ProcessEvent(ev);
+                while (appState.window->pollEvent(ev))
+                    ProcessEvent(appState, ev);
 
-                _totalTime = static_cast<float>(i) / fps;
+                appState.totalTime = static_cast<float>(i) / fps;
                 
-                UpdateScene(_totalTime, runtime); // Update scene state for current time
-                Render();
-                if (_window) _window->display(); // Optional: show progress
+                UpdateScene(appState, appState.totalTime, runtime); // Update scene state for current time
+                Render(appState);
+                if (appState.window) appState.window->display(); // Optional: show progress
 
                 printf("\rRendering frame %d / %d (%.1f%%)", i + 1, totalFrames, 100.0f * (i + 1) / totalFrames);
                 fflush(stdout);
 
                 // Capture frame for video
-                sf::Image img = _renderTargetFinal->copyToImage();
+                sf::Image img = appState.renderTargetFinal->copyToImage();
                 
                 // Save frame as PNG
                 std::ostringstream frameName;
-                frameName << framesDir << "/frame_" << std::setfill('0') << std::setw(4) << frameCount++ << ".png";
+                frameName << framesDir << "/frame_" << std::setfill('0') << std::setw(4) << appState.frameCount++ << ".png";
                 std::string framePath = frameName.str();
                 
                 if (!img.saveToFile(framePath))
@@ -321,18 +289,14 @@ int main(int argc, char** argv)
             printf("\nFrames rendered. Stitching video with ffmpeg...\n");
             
             // Construct ffmpeg command
-            // Try to use absolute path if simple 'ffmpeg' fails
             std::string ffmpegPath = "ffmpeg";
             
             // Check if ffmpeg is in path
             if (std::system("ffmpeg -version > nul 2>&1") != 0)
             {
-                // Try to find it in LocalAppData
                 const char* localAppData = std::getenv("LOCALAPPDATA");
                 if (localAppData)
                 {
-                    // This is a bit of a hack, but it works for Winget installs
-                    // We iterate through Microsoft\WinGet\Packages looking for ffmpeg.exe
                     try {
                         std::string basePath = std::string(localAppData) + "\\Microsoft\\WinGet\\Packages";
                         if (std::filesystem::exists(basePath))
@@ -355,27 +319,20 @@ int main(int argc, char** argv)
 
             // ffmpeg -framerate <fps> -i <dir>/frame_%04d.png -c:v libx264 -pix_fmt yuv420p <output_file>.mp4
             std::ostringstream cmd;
-            // Wrap the entire command in quotes for cmd.exe if it contains quoted arguments
-            // Actually, std::system just passes the string.
-            // If the executable path has spaces, it must be quoted.
-            // If the arguments have spaces, they must be quoted.
-            // "path to exe" "arg 1" "arg 2"
-            // This structure can be problematic for cmd.exe /S /C "command" logic.
-            // But usually just ensuring the exe is quoted works.
-            // Let's try adding "cmd /c " prefix explicitly to control quoting behavior.
-            std::ostringstream finalCmd;
 #ifdef _WIN32
-            finalCmd << "\"\"" << ffmpegPath << "\" -y -framerate " << fps 
-                     << " -i \"" << framesDir << "/frame_%04d.png\""
-                     << " -c:v libx264 -pix_fmt yuv420p \"" << videoFilename << "\"\"";
+            // Windows specific quoting
+            // Use cmd /c to handle quotes properly
+            cmd << "cmd /c \"\"" << ffmpegPath << "\" -y -framerate " << fps 
+                << " -i \"" << framesDir << "/frame_%04d.png\""
+                << " -c:v libx264 -pix_fmt yuv420p \"" << videoFilename << "\"\"";
 #else
-            finalCmd << "\"" << ffmpegPath << "\" -y -framerate " << fps 
-                     << " -i \"" << framesDir << "/frame_%04d.png\""
-                     << " -c:v libx264 -pix_fmt yuv420p \"" << videoFilename << "\"";
+            cmd << "\"" << ffmpegPath << "\" -y -framerate " << fps 
+                << " -i \"" << framesDir << "/frame_%04d.png\""
+                << " -c:v libx264 -pix_fmt yuv420p \"" << videoFilename << "\"";
 #endif
             
-            printf("Running command: %s\n", finalCmd.str().c_str());
-            int ret = std::system(finalCmd.str().c_str());
+            printf("Running command: %s\n", cmd.str().c_str());
+            int ret = std::system(cmd.str().c_str());
             
             if (ret == 0)
             {
@@ -396,33 +353,55 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!_frameTimes.empty())
+    if (!appState.frameTimes.empty())
     {
         double sum = 0.0;
-        double minT = _frameTimes[0];
-        double maxT = _frameTimes[0];
-        for (double t : _frameTimes)
+        double minT = appState.frameTimes[0];
+        double maxT = appState.frameTimes[0];
+        for (double t : appState.frameTimes)
         {
             sum += t;
             if (t < minT) minT = t;
             if (t > maxT) maxT = t;
         }
-        double mean = sum / _frameTimes.size();
+        double mean = sum / appState.frameTimes.size();
         
         double sqSum = 0.0;
-        for (double t : _frameTimes)
+        for (double t : appState.frameTimes)
         {
             sqSum += (t - mean) * (t - mean);
         }
-        double stdDev = std::sqrt(sqSum / _frameTimes.size());
+        double stdDev = std::sqrt(sqSum / appState.frameTimes.size());
         
         printf("\nFrame Time Stats (ms):\n");
-        printf("  Count: %zu\n", _frameTimes.size());
+        printf("  Count: %zu\n", appState.frameTimes.size());
         printf("  Mean:  %.2f ms\n", mean);
         printf("  Std:   %.2f ms\n", stdDev);
         printf("  Min:   %.2f ms\n", minT);
         printf("  Max:   %.2f ms\n", maxT);
     }
+    
+    // Explicitly reset pointers to control destruction order
+    // Order: Renderer (uses Scene, Texture), Scene, Texture, Window
+    // But Renderer might use Texture (renderTargetFinal).
+    // Actually Render() passes renderTargetFinal to Renderer->Render().
+    // Renderer does NOT own renderTargetFinal.
+    // Renderer DOES own shared_ptr<Scene>.
+    
+    // Safe order:
+    // 1. Renderer (releases scene)
+    // 2. Scene (releases resources)
+    // 3. ImageBox (uses Texture)
+    // 4. Texture (renderTargetFinal) - depends on Window context?
+    // 5. Window (must be last)
+    
+    printf("Cleaning up resources...\n");
+    appState.renderer.reset();
+    appState.scene.reset();
+    appState.imageBox.reset();
+    appState.renderTargetFinal.reset();
+    appState.window.reset();
 
+    printf("Exiting application.\n");
     return 0;
 }

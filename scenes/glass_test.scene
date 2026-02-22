@@ -34,44 +34,32 @@
             "center": [0.0, 75.0, 0.0],
             "size": [150.0, 150.0],
             "uv_scale": 1.0,
-            "material": {
-                "albedo": "assets/Materials/StainedGlass/Albedo.jpg",
-                "alpha": "assets/Materials/StainedGlass/Alpha.png",
-                "roughness": 0.1,
-                "metallic": 0.5
-            }
+            "material": "StainedGlass.mat"
         },
         {
-            "name": "Red Cube",
+            "name": "Ceramic Cube",
             "type": "cube",
             "center": [-150.0, 25.0, 0.0],
             "size": 50.0,
-            "material": {
-                "albedo": [1.0, 0.0, 0.0],
-                "roughness": 0.5,
-                "metallic": 0.0
-            }
+            "material": "Ceramic.mat"
         },
         {
-            "name": "Green Cube",
+            "name": "Pool Tile Cube",
             "type": "cube",
             "center": [150.0, 25.0, 0.0],
             "size": 50.0,
-            "material": {
-                "albedo": [0.0, 1.0, 0.0],
-                "roughness": 0.5,
-                "metallic": 0.0
-            }
+            "material": "PoolTile.mat"
         }
     ],
     "animators": [
         {
-            "target": "Red Cube",
+            "target": "Ceramic Cube",
             "property": "position",
+            "loop": true,
             "keyframes": [
                 { "time": 0.0, "value": [-150.0, 25.0, 0.0] },
-                { "time": 0.5, "value": [-150.0, 75.0, 0.0] },
-                { "time": 1.0, "value": [-150.0, 25.0, 0.0] }
+                { "time": 2.0, "value": [-150.0, 75.0, 0.0] },
+                { "time": 4.0, "value": [-150.0, 25.0, 0.0] }
             ]
         }
     ]

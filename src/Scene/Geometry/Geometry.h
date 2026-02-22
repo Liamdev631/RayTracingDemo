@@ -14,7 +14,9 @@ class Geometry
 {
 public:
     /** @brief Name of the object for identification and animation. */
-    std::string Name;
+	std::string Name;
+
+    virtual ~Geometry() = default;
 
 	/**
 	 * @brief Tests ray intersection and outputs hit data.

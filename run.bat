@@ -16,3 +16,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo Run: 10s Animation at 256x256
 build\Release\RayTracingDemo.exe --scene "%SCENE%" --width %WIDTH% --height %HEIGHT% --stratified-samples %SAMPLES% --runtime %DURATION% %2 %3 %4 %5
+if %ERRORLEVEL% NEQ 0 (
+    echo Run failed with exit code %ERRORLEVEL%.
+    exit /b %ERRORLEVEL%
+)
