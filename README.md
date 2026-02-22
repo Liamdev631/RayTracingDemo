@@ -41,4 +41,4 @@ This project uses CMake for build configuration and dependency management (Fetch
 ### Glass Test Scene
 Below is a video demonstration of the `glass_test` scene showcasing the three sample materials: Stained Glass, Ceramic, and Pool Tile. Click the image to watch on YouTube.
 
-[![Glass Test Render](assets/screenshots/glass_test_render.png)](https://www.youtube.com/watch?v=UvUhHd8LImA)
+[![Glass Test Video](https://img.youtube.com/vi/UvUhHd8LImA/0.jpg)](https://www.youtube.com/watch?v=UvUhHd8LImA)
